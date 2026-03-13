@@ -704,22 +704,6 @@
         }
         
         // Add testing bots to lobby
-        function addTestingBots() {
-            const botNames = ['أحمد', 'فاطمة', 'محمد', 'عائشة', 'علي'];
-            const botPlayers = botNames.slice(0, 4).map((name, index) => ({
-                id: 'bot-' + Date.now() + '-' + index,
-                name: name + ' (Bot)',
-                isHost: false
-            }));
-            
-            const allPlayers = [
-                {id: gameState.playerId, name: gameState.playerName + ' (You)', isHost: true},
-                ...botPlayers
-            ];
-            updatePlayerList(allPlayers);
-            console.log('Testing bots added:', botPlayers);
-        }
-
         function joinRoom() {
             const name = document.getElementById('playerName').value.trim();
             const roomCode = document.getElementById('joinRoomCode').value.trim().toUpperCase();
@@ -758,9 +742,6 @@
             document.getElementById('lobbyPlayers').style.display = 'block';
             document.getElementById('startBtn').style.display = 'block';
             document.getElementById('createSection').style.display = 'none';
-            
-            // Add testing bots for solo development
-            setTimeout(() => addTestingBots(), 500);
         }
 
         function handleRoomJoined(payload) {
