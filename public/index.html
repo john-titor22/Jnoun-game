@@ -504,6 +504,9 @@
         <div class="vignette"></div>
         <div class="film-grain"></div>
         <div class="esc-hint">Press ESC for Menu</div>
+        <div style="position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; font-family: monospace; z-index: 200; color: #4ecca3; font-size: 0.9em;">
+            FPS: <span id="fps">60</span>
+        </div>
         <div class="hud-top">
             <div class="hud-phase" id="hudPhase">🌙 الليل</div>
         </div>
@@ -516,6 +519,7 @@
         <div class="controls-info" id="controlsInfo">
             <div>🖱️ Mouse - Look Around</div>
             <div id="moveKeysDisplay">WASD - Move</div>
+            <div>SPACE - Jump</div>
             <div>Shift - Sprint</div>
             <div>E - Interact</div>
             <div>ESC - Menu</div>
@@ -615,6 +619,17 @@
             canMove: true,
             willBePossessed: false,
             inGame: false
+        };
+
+        // Physics system
+        const physics = {
+            gravity: -15,
+            verticalVelocity: 0,
+            isGrounded: false,
+            groundLevel: 1.6,
+            jumpVelocity: 6,
+            terminalVelocity: -20,
+            lastFallHeight: 0
         };
 
         // Riad architecture configuration
@@ -1051,7 +1066,7 @@
             character.add(body);
             
             // Head
-            const headGeom = new THREE.SphereGeometry(0.2, 16, 16);
+            const headGeom = new THREE.SphereGeometry(0.2, 8, 8);
             const headMat = new THREE.MeshStandardMaterial({
                 color: 0xffdbac, // Skin tone
                 roughness: 0.9
@@ -1266,6 +1281,13 @@
             document.addEventListener('keydown', (e) => {
                 keys[e.key.toLowerCase()] = true;
                 
+                // Jump with spacebar
+                if (e.key === ' ' && physics.isGrounded) {
+                    physics.verticalVelocity = physics.jumpVelocity;
+                    physics.isGrounded = false;
+                    e.preventDefault();
+                }
+                
                 // Debug: T to show task locations
                 if (e.key.toLowerCase() === 't') {
                     console.log('=== TASK DEBUG ===');
@@ -1385,7 +1407,7 @@
             const platform = new THREE.Mesh(platformGeom, platformMat);
             platform.position.set(x, y, z);
             platform.receiveShadow = true;
-            platform.castShadow = true;
+            platform.castShadow = false;
             scene.add(platform);
         }
 
@@ -1414,7 +1436,8 @@
                     railingMat
                 );
                 post.position.set(x, y, z);
-                post.castShadow = true;
+                post.castShadow = false;
+                post.receiveShadow = true;
                 scene.add(post);
             });
         }
@@ -1440,7 +1463,8 @@
                 })
             );
             fountain.position.set(0, 0.25, 0);
-            fountain.castShadow = true;
+            fountain.castShadow = false;
+            fountain.receiveShadow = true;
             scene.add(fountain);
         }
 
@@ -1498,7 +1522,7 @@
                     material
                 );
                 wall.position.set(x, floorY + height/2, z - depth/2);
-                wall.castShadow = true;
+                wall.castShadow = false;
                 wall.receiveShadow = true;
                 scene.add(wall);
                 RIAD_CONFIG.walls.push(wall);
@@ -1513,7 +1537,7 @@
                     material
                 );
                 wall.position.set(x, floorY + height/2, z + depth/2);
-                wall.castShadow = true;
+                wall.castShadow = false;
                 wall.receiveShadow = true;
                 scene.add(wall);
                 RIAD_CONFIG.walls.push(wall);
@@ -1528,7 +1552,7 @@
                     material
                 );
                 wall.position.set(x + width/2, floorY + height/2, z);
-                wall.castShadow = true;
+                wall.castShadow = false;
                 wall.receiveShadow = true;
                 scene.add(wall);
                 RIAD_CONFIG.walls.push(wall);
@@ -1543,7 +1567,7 @@
                     material
                 );
                 wall.position.set(x - width/2, floorY + height/2, z);
-                wall.castShadow = true;
+                wall.castShadow = false;
                 wall.receiveShadow = true;
                 scene.add(wall);
                 RIAD_CONFIG.walls.push(wall);
@@ -1564,7 +1588,8 @@
                     material
                 );
                 wall1.position.set(x - length/2 + halfGap/2, floorY + height/2, z);
-                wall1.castShadow = true;
+                wall1.castShadow = false;
+                wall1.receiveShadow = true;
                 scene.add(wall1);
                 RIAD_CONFIG.walls.push(wall1);
                 
@@ -1574,7 +1599,8 @@
                     material
                 );
                 wall2.position.set(x + length/2 - halfGap/2, floorY + height/2, z);
-                wall2.castShadow = true;
+                wall2.castShadow = false;
+                wall2.receiveShadow = true;
                 scene.add(wall2);
                 RIAD_CONFIG.walls.push(wall2);
             } else {
@@ -1584,7 +1610,8 @@
                     material
                 );
                 wall1.position.set(x, floorY + height/2, z - length/2 + halfGap/2);
-                wall1.castShadow = true;
+                wall1.castShadow = false;
+                wall1.receiveShadow = true;
                 scene.add(wall1);
                 RIAD_CONFIG.walls.push(wall1);
                 
@@ -1594,7 +1621,8 @@
                     material
                 );
                 wall2.position.set(x, floorY + height/2, z + length/2 - halfGap/2);
-                wall2.castShadow = true;
+                wall2.castShadow = false;
+                wall2.receiveShadow = true;
                 scene.add(wall2);
                 RIAD_CONFIG.walls.push(wall2);
             }
@@ -1659,7 +1687,7 @@
                 
                 const zOffset = direction === 'north' ? -i * stepDepth : i * stepDepth;
                 step.position.set(x, y + i * stepHeight + stepHeight/2, z + zOffset);
-                step.castShadow = true;
+                step.castShadow = false;
                 step.receiveShadow = true;
                 scene.add(step);
                 
@@ -1691,7 +1719,7 @@
                     wallMat
                 );
                 wall.position.set(x, y, z);
-                wall.castShadow = true;
+                wall.castShadow = false;
                 wall.receiveShadow = true;
                 scene.add(wall);
                 RIAD_CONFIG.walls.push(wall);
@@ -1701,27 +1729,36 @@
         function setupRiadLighting() {
             scene.fog = new THREE.Fog(0x1a1510, 5, 35);
             
-            const ambient = new THREE.AmbientLight(0x2a1a0a, 0.2);
+            // Increased ambient light to compensate for fewer point lights
+            const ambient = new THREE.AmbientLight(0x2a1a0a, 0.35);
             scene.add(ambient);
             
-            const courtyardLight = new THREE.PointLight(0xffaa44, 0.6, 20);
+            // Courtyard light - main shadow caster
+            const courtyardLight = new THREE.PointLight(0xffaa44, 0.8, 25);
             courtyardLight.position.set(0, 5, 0);
             courtyardLight.castShadow = true;
-            courtyardLight.shadow.mapSize.width = 2048;
-            courtyardLight.shadow.mapSize.height = 2048;
+            courtyardLight.shadow.mapSize.width = 1024;
+            courtyardLight.shadow.mapSize.height = 1024;
+            courtyardLight.userData.flicker = true;
+            courtyardLight.userData.baseIntensity = 0.8;
+            courtyardLight.userData.offset = 0;
             scene.add(courtyardLight);
             
-            [...RIAD_CONFIG.rooms.groundFloor, ...RIAD_CONFIG.rooms.upperFloor].forEach((room, i) => {
-                const light = new THREE.PointLight(0xff8833, 0.3, 8);
-                const floorY = i < RIAD_CONFIG.rooms.groundFloor.length ? 0 : RIAD_CONFIG.building.floorHeight;
-                light.position.set(room.x, floorY + 2, room.z);
-                light.castShadow = true;
-                scene.add(light);
-                
-                setInterval(() => {
-                    light.intensity = 0.2 + Math.random() * 0.2;
-                }, 150 + Math.random() * 300);
-            });
+            // Ground floor general light
+            const groundLight = new THREE.PointLight(0xff8833, 0.5, 20);
+            groundLight.position.set(0, 2, 0);
+            groundLight.userData.flicker = true;
+            groundLight.userData.baseIntensity = 0.5;
+            groundLight.userData.offset = Math.PI * 0.5;
+            scene.add(groundLight);
+            
+            // Upper floor general light
+            const upperLight = new THREE.PointLight(0xff8833, 0.5, 20);
+            upperLight.position.set(0, RIAD_CONFIG.building.floorHeight + 2, 0);
+            upperLight.userData.flicker = true;
+            upperLight.userData.baseIntensity = 0.5;
+            upperLight.userData.offset = Math.PI;
+            scene.add(upperLight);
         }
 
         // ==================== DOOR INTERACTION ====================
@@ -1822,7 +1859,7 @@
                 }
                 
                 const marker = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.5, 16, 16),
+                    new THREE.SphereGeometry(0.5, 8, 8),
                     new THREE.MeshStandardMaterial({
                         color: 0x00ff00,
                         emissive: 0x00ff00,
@@ -2077,7 +2114,7 @@
                 emissiveIntensity: 2
             });
             [-0.25, 0.25].forEach(x => {
-                const eye = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), eyeMat);
+                const eye = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), eyeMat);
                 eye.position.set(x, 0.9, 0.5);
                 jnounEntity.add(eye);
             });
@@ -2140,13 +2177,24 @@
         }
 
         // ANIMATION LOOP
+        let fpsFrames = 0;
+        let fpsLastTime = Date.now();
+
         function animate() {
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
             
             if (gameState.canMove) {
                 updatePlayerMovement(delta);
             }
+            
+            // Update flickering lights using sine wave
+            scene.traverse(obj => {
+                if (obj.isLight && obj.userData.flicker) {
+                    obj.intensity = obj.userData.baseIntensity + Math.sin(time * 3 + obj.userData.offset) * 0.1;
+                }
+            });
             
             // Animate task markers
             taskMarkers.forEach(marker => {
@@ -2187,7 +2235,54 @@
             // Check door proximity for interaction
             checkDoorProximity();
             
+            // FPS Counter
+            fpsFrames++;
+            const now = Date.now();
+            if (now - fpsLastTime > 1000) {
+                const fpsDisplay = document.getElementById('fps');
+                if (fpsDisplay) fpsDisplay.textContent = fpsFrames;
+                fpsFrames = 0;
+                fpsLastTime = now;
+            }
+            
             renderer.render(scene, camera);
+        }
+
+        function getGroundHeight(position) {
+            // Check if on stairs
+            for (let stair of RIAD_CONFIG.stairs) {
+                const stairPos = new THREE.Vector3(stair.x || 0, stair.height, stair.z || 0);
+                const stairBox = new THREE.Box3().setFromCenterAndSize(
+                    stairPos,
+                    new THREE.Vector3(2.5, 0.5, 1)
+                );
+                
+                const playerPoint = new THREE.Vector3(position.x, position.y, position.z);
+                if (stairBox.containsPoint(playerPoint)) {
+                    return stair.height + 1.6;
+                }
+            }
+            
+            // Check if on upper floor platform
+            const courtyardBounds = {
+                minX: -RIAD_CONFIG.courtyard.width / 2,
+                maxX: RIAD_CONFIG.courtyard.width / 2,
+                minZ: -RIAD_CONFIG.courtyard.length / 2,
+                maxZ: RIAD_CONFIG.courtyard.length / 2
+            };
+            
+            const inCourtyard = position.x > courtyardBounds.minX && 
+                               position.x < courtyardBounds.maxX &&
+                               position.z > courtyardBounds.minZ && 
+                               position.z < courtyardBounds.maxZ;
+            
+            if (!inCourtyard && position.y > RIAD_CONFIG.building.floorHeight / 2) {
+                // On upper floor walkway/rooms
+                return RIAD_CONFIG.building.floorHeight + 1.6;
+            }
+            
+            // Ground floor
+            return 1.6;
         }
 
         function updatePlayerMovement(delta) {
@@ -2207,7 +2302,7 @@
             
             // Play footstep sounds
             const isMoving = velocity.length() > 0.01;
-            if (isMoving) {
+            if (isMoving && physics.isGrounded) {
                 const footstepInterval = isSprinting ? 0.25 : 0.5;
                 const now = clock.getElapsedTime();
                 if (now - soundManager.lastFootstepTime > footstepInterval) {
@@ -2219,22 +2314,35 @@
             // Store old position for collision rollback
             const oldPos = camera.position.clone();
             
-            // Try to move
+            // Apply horizontal movement
             camera.position.add(velocity);
             
-            // Create player collision box
+            // Apply gravity
+            if (!physics.isGrounded) {
+                physics.verticalVelocity += physics.gravity * delta;
+                physics.verticalVelocity = Math.max(physics.verticalVelocity, physics.terminalVelocity);
+            }
+            
+            // Apply vertical velocity
+            camera.position.y += physics.verticalVelocity * delta;
+            
+            // Get ground height for current position
+            const groundHeight = getGroundHeight(camera.position);
+            
+            // Ground detection and collision
             const playerBox = new THREE.Box3().setFromCenterAndSize(
                 camera.position,
-                new THREE.Vector3(0.5, 1.6, 0.5)
+                new THREE.Vector3(0.5, 1.8, 0.5)
             );
             
             let collided = false;
             
             // Check wall collisions
             RIAD_CONFIG.walls.forEach(wall => {
-                const wallBox = new THREE.Box3().setFromObject(wall);
-                if (playerBox.intersectsBox(wallBox)) {
-                    collided = true;
+                if (wall.box) {
+                    if (playerBox.intersectsBox(wall.box)) {
+                        collided = true;
+                    }
                 }
             });
             
@@ -2242,33 +2350,34 @@
             RIAD_CONFIG.doors.forEach(door => {
                 if (!door.userData.isOpen) {
                     const doorBox = new THREE.Box3().setFromObject(door);
+                    doorBox.min.y = groundHeight - 0.1;
+                    doorBox.max.y = groundHeight + 2.5;
+                    
                     if (playerBox.intersectsBox(doorBox)) {
                         collided = true;
                     }
                 }
             });
             
-            // If collided, revert position
+            // Revert horizontal collision
             if (collided) {
-                camera.position.copy(oldPos);
+                camera.position.x = oldPos.x;
+                camera.position.z = oldPos.z;
             }
             
-            // Check stairs for auto-climb
-            RIAD_CONFIG.stairs.forEach(stair => {
-                if (playerBox.intersectsBox(stair.box)) {
-                    camera.position.y = stair.height + 1.6;
-                }
-            });
+            // Check if on ground
+            if (camera.position.y <= groundHeight) {
+                camera.position.y = groundHeight;
+                physics.verticalVelocity = 0;
+                physics.isGrounded = true;
+            } else {
+                physics.isGrounded = false;
+            }
             
             // Clamp to building bounds
             const bound = RIAD_CONFIG.building.width / 2 - 0.5;
             camera.position.x = Math.max(-bound, Math.min(bound, camera.position.x));
             camera.position.z = Math.max(-bound, Math.min(bound, camera.position.z));
-            
-            // Ensure minimum height (ground floor)
-            if (camera.position.y < 1.6) {
-                camera.position.y = 1.6;
-            }
         }
 
         function clearScene() {
