@@ -479,12 +479,8 @@ function evaluateChoices(roomCode) {
         }
     });
     
-    broadcastToRoom(roomCode, {
-        type: 'CHOICE_RESULTS',
-        payload: {
-            message: 'Some feel safer. Others feel... watched.'
-        }
-    });
+    // NO BROADCAST - complete silence after choices
+    // Players won't know if they chose correctly until night
     
     setTimeout(() => {
         startDiscussionPhase(roomCode);
@@ -593,11 +589,32 @@ function transitionToNight(roomCode) {
     });
     
     const alive = Array.from(room.players.values()).filter(p => p.alive);
+    
     alive.forEach(player => {
-        sendToPlayer(player.ws, {
-            type: 'ENTER_BEDROOM',
-            payload: {}
-        });
+        // ONLY marked players get special message
+        if (player.marked) {
+            sendToPlayer(player.ws, {
+                type: 'ENTER_BEDROOM',
+                payload: { 
+                    marked: true,
+                    message: 'شيء ما يقترب... - Something is coming...'
+                }
+            });
+        } else if (player.protected) {
+            sendToPlayer(player.ws, {
+                type: 'ENTER_BEDROOM',
+                payload: { 
+                    protected: true,
+                    message: 'تشعر بالأمان - You feel safe'
+                }
+            });
+        } else {
+            // Followed nobody or roles (Imam/Jnoun themselves)
+            sendToPlayer(player.ws, {
+                type: 'ENTER_BEDROOM',
+                payload: {}
+            });
+        }
     });
     
     setTimeout(() => {
@@ -616,19 +633,34 @@ function executeNightKill(roomCode) {
         const victim = markedPlayers[Math.floor(Math.random() * markedPlayers.length)];
         victim.alive = false;
         
+        // Victim gets nightmare chase (they know NOW)
         sendToPlayer(victim.ws, {
             type: 'NIGHTMARE_CHASE',
-            payload: { message: 'الجن يطاردك!' }
+            payload: { 
+                message: 'الجن يطاردك! - You were marked!'
+            }
+        });
+        
+        // Other marked players who SURVIVED see a close call
+        markedPlayers.forEach(p => {
+            if (p.id !== victim.id) {
+                sendToPlayer(p.ws, {
+                    type: 'CLOSE_CALL',
+                    payload: {
+                        message: 'لقد نجوت... هذه المرة - You survived... this time'
+                    }
+                });
+            }
         });
         
         setTimeout(() => {
+            // NO HINT - players must deduce themselves
             broadcastToRoom(roomCode, {
                 type: 'PLAYER_DIED',
                 payload: {
                     playerId: victim.id,
                     playerName: victim.name,
-                    message: `${victim.name} was found dead...`,
-                    hint: `They had followed ${room.jnoun.name}'s command yesterday.`
+                    message: `☠️ ${victim.name} was killed by Jnoun during the night`
                 }
             });
             

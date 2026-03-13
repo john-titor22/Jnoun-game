@@ -851,6 +851,12 @@
                 case 'ENTER_BEDROOM':
                     handleEnterBedroom(payload);
                     break;
+                case 'CLOSE_CALL':
+                    handleCloseCall(payload);
+                    break;
+                case 'NIGHT_PEACEFUL':
+                    updateHUD('✅ ليلة سلمية', payload.message);
+                    break;
                 case 'TRANSFORMATION':
                     handleTransformation(payload);
                     break;
@@ -1007,11 +1013,64 @@
         }
 
         function handleEnterBedroom(payload) {
-            gameState.willBePossessed = payload.willBePossessed;
-            // Delay to sync all players entering bedroom
-            setTimeout(() => {
-                createBedroomScene();
-            }, 1000);
+            createBedroomScene();
+            
+            // Show different messages based on status
+            if (payload.marked) {
+                // MARKED - player knows they're in danger
+                document.getElementById('breathingOverlay').classList.add('active');
+                
+                updateHUD('⚠️ محفوف بالمخاطر', 'شيء ما خاطئ... أنت تشعر بالمراقبة');
+                
+                // Intensify breathing overlay - red tint
+                const overlay = document.getElementById('breathingOverlay');
+                overlay.style.background = 'radial-gradient(circle, transparent 40%, rgba(139, 0, 0, 0.6) 100%)';
+                overlay.style.animation = 'breathe 2s ease-in-out infinite';
+                
+            } else if (payload.protected) {
+                // PROTECTED - player feels safe
+                updateHUD('🛡️ محمي', 'أنت تشعر بالسلام والأمان');
+                
+                // Golden glow
+                const overlay = document.getElementById('breathingOverlay');
+                overlay.classList.add('active');
+                overlay.style.background = 'radial-gradient(circle, transparent 60%, rgba(255, 215, 0, 0.2) 100%)';
+                
+            } else {
+                // NEUTRAL - followed nobody or is Imam/Jnoun
+                updateHUD('🌙 الليل', 'أنت في سريرك...');
+            }
+        }
+        
+        function handleCloseCall(payload) {
+            // Marked player who survived sees this
+            
+            const flashOverlay = document.createElement('div');
+            flashOverlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: #8B0000;
+                z-index: 9000;
+                animation: flash-fade 2s ease-out;
+            `;
+            
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes flash-fade {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.8; }
+                    100% { opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+            document.body.appendChild(flashOverlay);
+            
+            setTimeout(() => flashOverlay.remove(), 2000);
+            
+            updateHUD('💀 نجاة', payload.message);
         }
 
         function handlePossession(payload) {
@@ -1060,6 +1119,8 @@
         }
 
         function followCommand(playerId) {
+            console.log('Following player:', playerId);
+            
             sendToServer('FOLLOW_COMMAND', {
                 roomCode: gameState.roomCode,
                 followingPlayerId: playerId
@@ -1067,7 +1128,9 @@
             
             const panel = document.getElementById('commandPanel');
             panel.style.display = 'none';
-            updateHUD('✓ تم اختيارك - CHOSEN', 'You have made your choice...');
+            
+            // NO FEEDBACK - complete silence
+            updateHUD('🤐 صمت', 'You made your choice. Now we wait...');
         }
 
         function showVotingPanel(payload) {
@@ -1103,12 +1166,8 @@
             updateHUD('✓ صواب - VOTED', 'Your vote has been cast');
         }
 
-        function handleChoiceResults(payload) {
-            updateHUD('📊 النتائج - RESULTS', payload.message);
-        }
-
-        function handlePlayerDeath(payload) {
-            updateHUD('💀 موت - DEATH', `${payload.playerName} was found dead. ${payload.hint}`);
+function handlePlayerDeath(payload) {
+            updateHUD('💀 موت - DEATH', payload.message);
         }
 
         function handleGameEnd(payload) {
