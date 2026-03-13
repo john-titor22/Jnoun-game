@@ -60,6 +60,15 @@ function handleMessage(ws, data) {
         case 'POSSESSION':
             handlePossession(payload);
             break;
+        case 'SUBMIT_COMMAND':
+            handleCommandSubmit(ws, payload);
+            break;
+        case 'FOLLOW_COMMAND':
+            handleFollowCommand(ws, payload);
+            break;
+        case 'PLAYER_VOTE':
+            handlePlayerVote(ws, payload);
+            break;
         default:
             console.log('Unknown message type:', type);
     }
@@ -74,8 +83,13 @@ function createRoom(ws, payload) {
         jnounCount: payload.jnounCount,
         phase: 'lobby',
         dayNumber: 0,
-        possessedPlayers: [],
-        gameStarted: false
+        gameStarted: false,
+        secretImam: null,
+        jnoun: null,
+        imamCommand: null,
+        jnounCommand: null,
+        playerChoices: {},
+        votes: {}
     };
     
     const player = {
@@ -84,7 +98,9 @@ function createRoom(ws, payload) {
         ws: ws,
         role: null,
         alive: true,
-        isHost: true
+        isHost: true,
+        protected: false,
+        marked: false
     };
     
     room.players.set(player.id, player);
@@ -132,7 +148,9 @@ function joinRoom(ws, payload) {
         ws: ws,
         role: null,
         alive: true,
-        isHost: false
+        isHost: false,
+        protected: false,
+        marked: false
     };
     
     room.players.set(player.id, player);
@@ -158,44 +176,540 @@ function startGame(roomCode) {
     const room = rooms.get(roomCode);
     if (!room) return;
     
+    const players = Array.from(room.players.values());
+    
+    if (players.length < 4) {
+        broadcastToRoom(roomCode, {
+            type: 'ERROR',
+            payload: { message: 'Need at least 4 players' }
+        });
+        return;
+    }
+    
     room.gameStarted = true;
     room.dayNumber = 1;
-    room.phase = 'day';
+    room.phase = 'gathering';
     
-    // DAY 1: Everyone starts as HUMAN
-    const players = Array.from(room.players.values());
-    players.forEach(player => {
-        player.role = 'human';
-        player.alive = true;
+    // DAY 1: Everyone human, but 1 secret Imam (doesn't know yet)
+    players.forEach(p => {
+        p.role = 'human';
+        p.alive = true;
+        p.protected = false;
+        p.marked = false;
     });
     
-    // Assign tasks to each player
-    const tasks = assignTasks(players);
+    // Select secret Imam (they don't know yet)
+    const shuffled = [...players].sort(() => Math.random() - 0.5);
+    room.secretImam = shuffled[0];
+    room.jnoun = null;
     
     broadcastToRoom(roomCode, {
         type: 'GAME_START',
         payload: {
-            phase: 'day',
+            phase: 'gathering',
             dayNumber: 1,
-            message: 'اليوم الأول - الجميع بشر'
+            message: 'اليوم الأول - اجتمعوا في الصالون'
         }
     });
     
-    // Send individual role info
+    // Everyone thinks they're human (including the Imam)
     players.forEach(player => {
         sendToPlayer(player.ws, {
             type: 'ROLE_ASSIGNED',
             payload: {
                 role: 'human',
-                tasks: tasks.get(player.id)
+                message: 'أنت إنسان - You are Human (for now...)'
             }
         });
     });
     
-    // Start day phase timer (2 minutes)
+    // Day lasts 60 seconds
+    setTimeout(() => {
+        transitionToNight1(roomCode);
+    }, 60000);
+}
+
+function transitionToNight1(roomCode) {
+    const room = rooms.get(roomCode);
+    room.phase = 'night';
+    room.dayNumber = 1;
+    
+    broadcastToRoom(roomCode, {
+        type: 'PHASE_CHANGE',
+        payload: {
+            phase: 'night',
+            message: 'الليل الأول - عودوا للنوم'
+        }
+    });
+    
+    const alivePlayers = Array.from(room.players.values()).filter(p => p.alive);
+    
+    alivePlayers.forEach(player => {
+        sendToPlayer(player.ws, {
+            type: 'ENTER_BEDROOM',
+            payload: {}
+        });
+    });
+    
+    // After 10 seconds, random player becomes Jnoun
+    setTimeout(() => {
+        transformRandomPlayerToJnoun(roomCode);
+    }, 10000);
+}
+
+function transformRandomPlayerToJnoun(roomCode) {
+    const room = rooms.get(roomCode);
+    
+    const alivePlayers = Array.from(room.players.values())
+        .filter(p => p.alive && p.id !== room.secretImam.id);
+    
+    if (alivePlayers.length === 0) return;
+    
+    const jnoun = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+    
+    jnoun.role = 'jnoun';
+    room.jnoun = jnoun;
+    
+    // Reveal to Jnoun ONLY
+    sendToPlayer(jnoun.ws, {
+        type: 'TRANSFORMATION',
+        payload: {
+            role: 'jnoun',
+            message: 'أنت الآن جني! - You are now Jnoun! Mark players for death by tricking them into following your commands.'
+        }
+    });
+    
+    // Reveal to Imam ONLY (now they know their role)
+    sendToPlayer(room.secretImam.ws, {
+        type: 'TRANSFORMATION',
+        payload: {
+            role: 'imam',
+            message: 'أنت الإمام! - You are the Imam! Protect players by guiding them safely.'
+        }
+    });
+    
+    // Update Imam's actual role
+    room.secretImam.role = 'imam';
+    
+    setTimeout(() => {
+        wakeUpForDay2(roomCode);
+    }, 10000);
+}
+
+function wakeUpForDay2(roomCode) {
+    const room = rooms.get(roomCode);
+    room.phase = 'day';
+    room.dayNumber = 2;
+    
+    broadcastToRoom(roomCode, {
+        type: 'PHASE_CHANGE',
+        payload: {
+            phase: 'day',
+            message: 'اليوم الثاني - Someone among you has changed...'
+        }
+    });
+    
+    setTimeout(() => {
+        startCommandPhase(roomCode);
+    }, 5000);
+}
+
+// Command templates for dual commanders
+const COMMAND_TEMPLATES = [
+    {
+        action: 'follow_to_room',
+        rooms: ['prayer room', 'salon', 'library', 'kitchen'],
+        text: (room) => `Follow me to ${room} for safety`
+    },
+    {
+        action: 'stay_together',
+        text: () => `Everyone stay together in the courtyard`
+    },
+    {
+        action: 'avoid_area',
+        areas: ['upper floor', 'dark rooms'],
+        text: (area) => `Avoid ${area} - it's dangerous`
+    },
+    {
+        action: 'gather_for_prayer',
+        text: () => `Gather for prayer in courtyard`
+    },
+    {
+        action: 'close_doors',
+        text: () => `Close and lock all bedroom doors`
+    }
+];
+
+function startCommandPhase(roomCode) {
+    const room = rooms.get(roomCode);
+    room.phase = 'commands';
+    
+    const template = COMMAND_TEMPLATES[Math.floor(Math.random() * COMMAND_TEMPLATES.length)];
+    
+    // Send command template to both Imam and Jnoun
+    sendToPlayer(room.secretImam.ws, {
+        type: 'ISSUE_COMMAND',
+        payload: {
+            template: template,
+            role: 'imam',
+            message: 'Issue a command to guide players to safety'
+        }
+    });
+    
+    sendToPlayer(room.jnoun.ws, {
+        type: 'ISSUE_COMMAND',
+        payload: {
+            template: template,
+            role: 'jnoun',
+            message: 'Issue a command to lure players to danger'
+        }
+    });
+    
+    room.imamCommand = null;
+    room.jnounCommand = null;
+    
+    // Wait 30 seconds for both to submit
+    setTimeout(() => {
+        broadcastCommands(roomCode);
+    }, 30000);
+}
+
+function handleCommandSubmit(ws, payload) {
+    const { roomCode, commandText, target } = payload;
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    
+    const player = room.players.get(ws.playerId);
+    if (!player) return;
+    
+    if (player.role === 'imam') {
+        room.imamCommand = {
+            playerId: player.id,
+            playerName: player.name,
+            text: commandText,
+            target: target,
+            type: 'imam'
+        };
+    } else if (player.role === 'jnoun') {
+        room.jnounCommand = {
+            playerId: player.id,
+            playerName: player.name,
+            text: commandText,
+            target: target,
+            type: 'jnoun'
+        };
+    }
+}
+
+function broadcastCommands(roomCode) {
+    const room = rooms.get(roomCode);
+    
+    const commands = [];
+    if (room.imamCommand) commands.push(room.imamCommand);
+    if (room.jnounCommand) commands.push(room.jnounCommand);
+    
+    if (commands.length === 0) {
+        // Default commands if none submitted
+        commands.push({
+            playerId: room.secretImam.id,
+            playerName: room.secretImam.name,
+            text: 'Follow me'
+        });
+        commands.push({
+            playerId: room.jnoun.id,
+            playerName: room.jnoun.name,
+            text: 'Follow me'
+        });
+    }
+    
+    // Shuffle order so players can't tell which is which
+    const shuffled = commands.sort(() => Math.random() - 0.5);
+    
+    broadcastToRoom(roomCode, {
+        type: 'COMMANDS_ANNOUNCED',
+        payload: {
+            commands: shuffled.map(c => ({
+                playerId: c.playerId,
+                playerName: c.playerName,
+                text: c.text
+            }))
+        }
+    });
+    
+    room.phase = 'execution';
+    room.playerChoices = {};
+    
+    // 90 seconds to follow a command
+    setTimeout(() => {
+        evaluateChoices(roomCode);
+    }, 90000);
+}
+
+function handleFollowCommand(ws, payload) {
+    const { roomCode, followingPlayerId } = payload;
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    
+    const player = room.players.get(ws.playerId);
+    if (!player || player.role !== 'human') return;
+    
+    room.playerChoices[player.id] = followingPlayerId;
+}
+
+function evaluateChoices(roomCode) {
+    const room = rooms.get(roomCode);
+    
+    // Determine who followed whom
+    room.players.forEach(player => {
+        if (!player.alive || player.role !== 'human') return;
+        
+        const choice = room.playerChoices[player.id];
+        
+        if (!choice) {
+            player.protected = false;
+            player.marked = false;
+        } else if (choice === room.secretImam.id) {
+            // Followed Imam = PROTECTED
+            player.protected = true;
+            player.marked = false;
+        } else if (choice === room.jnoun.id) {
+            // Followed Jnoun = MARKED for death
+            player.protected = false;
+            player.marked = true;
+        }
+    });
+    
+    broadcastToRoom(roomCode, {
+        type: 'CHOICE_RESULTS',
+        payload: {
+            message: 'Some feel safer. Others feel... watched.'
+        }
+    });
+    
+    setTimeout(() => {
+        startDiscussionPhase(roomCode);
+    }, 5000);
+}
+
+function startDiscussionPhase(roomCode) {
+    const room = rooms.get(roomCode);
+    room.phase = 'discussion';
+    
+    broadcastToRoom(roomCode, {
+        type: 'PHASE_CHANGE',
+        payload: {
+            phase: 'discussion',
+            message: 'ناقش من تشك به - 60 seconds to discuss'
+        }
+    });
+    
+    setTimeout(() => {
+        startVoting(roomCode);
+    }, 60000);
+}
+
+function startVoting(roomCode) {
+    const room = rooms.get(roomCode);
+    room.phase = 'voting';
+    room.votes = {};
+    
+    const alive = Array.from(room.players.values())
+        .filter(p => p.alive)
+        .map(p => ({ id: p.id, name: p.name }));
+    
+    broadcastToRoom(roomCode, {
+        type: 'START_VOTING',
+        payload: { 
+            players: alive,
+            message: 'Vote to eliminate suspected Jnoun'
+        }
+    });
+    
+    setTimeout(() => {
+        processVotes(roomCode);
+    }, 30000);
+}
+
+function handlePlayerVote(ws, payload) {
+    const { roomCode, votedForId } = payload;
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    
+    const player = room.players.get(ws.playerId);
+    if (!player || !player.alive) return;
+    
+    room.votes[player.id] = votedForId;
+}
+
+function processVotes(roomCode) {
+    const room = rooms.get(roomCode);
+    
+    const voteCount = {};
+    Object.values(room.votes).forEach(votedFor => {
+        voteCount[votedFor] = (voteCount[votedFor] || 0) + 1;
+    });
+    
+    let eliminated = null;
+    let maxVotes = 0;
+    
+    Object.entries(voteCount).forEach(([playerId, count]) => {
+        if (count > maxVotes) {
+            maxVotes = count;
+            eliminated = playerId;
+        }
+    });
+    
+    if (eliminated) {
+        const player = room.players.get(eliminated);
+        if (player) player.alive = false;
+        
+        broadcastToRoom(roomCode, {
+            type: 'PLAYER_ELIMINATED',
+            payload: {
+                playerId: player.id,
+                playerName: player.name,
+                message: `${player.name} was eliminated`
+            }
+        });
+    }
+    
+    if (checkWinCondition(roomCode)) return;
+    
     setTimeout(() => {
         transitionToNight(roomCode);
-    }, 120000);
+    }, 5000);
+}
+
+function transitionToNight(roomCode) {
+    const room = rooms.get(roomCode);
+    room.phase = 'night';
+    
+    broadcastToRoom(roomCode, {
+        type: 'PHASE_CHANGE',
+        payload: {
+            phase: 'night',
+            message: 'الليل - عودوا للنوم'
+        }
+    });
+    
+    const alive = Array.from(room.players.values()).filter(p => p.alive);
+    alive.forEach(player => {
+        sendToPlayer(player.ws, {
+            type: 'ENTER_BEDROOM',
+            payload: {}
+        });
+    });
+    
+    setTimeout(() => {
+        executeNightKill(roomCode);
+    }, 15000);
+}
+
+function executeNightKill(roomCode) {
+    const room = rooms.get(roomCode);
+    
+    // Jnoun kills ONE marked player (if any)
+    const markedPlayers = Array.from(room.players.values())
+        .filter(p => p.alive && p.marked && p.role === 'human');
+    
+    if (markedPlayers.length > 0) {
+        const victim = markedPlayers[Math.floor(Math.random() * markedPlayers.length)];
+        victim.alive = false;
+        
+        sendToPlayer(victim.ws, {
+            type: 'NIGHTMARE_CHASE',
+            payload: { message: 'الجن يطاردك!' }
+        });
+        
+        setTimeout(() => {
+            broadcastToRoom(roomCode, {
+                type: 'PLAYER_DIED',
+                payload: {
+                    playerId: victim.id,
+                    playerName: victim.name,
+                    message: `${victim.name} was found dead...`,
+                    hint: `They had followed ${room.jnoun.name}'s command yesterday.`
+                }
+            });
+            
+            // Reset marks and protection
+            room.players.forEach(p => {
+                p.protected = false;
+                p.marked = false;
+            });
+            
+            if (checkWinCondition(roomCode)) return;
+            
+            setTimeout(() => {
+                room.dayNumber++;
+                startCommandPhase(roomCode);
+            }, 8000);
+        }, 25000);
+        
+    } else {
+        broadcastToRoom(roomCode, {
+            type: 'NIGHT_PEACEFUL',
+            payload: {
+                message: 'الليل مر بسلام - The night passed peacefully'
+            }
+        });
+        
+        // Reset marks and protection
+        room.players.forEach(p => {
+            p.protected = false;
+            p.marked = false;
+        });
+        
+        if (checkWinCondition(roomCode)) return;
+        
+        setTimeout(() => {
+            room.dayNumber++;
+            startCommandPhase(roomCode);
+        }, 5000);
+    }
+}
+
+function checkWinCondition(roomCode) {
+    const room = rooms.get(roomCode);
+    const alive = Array.from(room.players.values()).filter(p => p.alive);
+    
+    const aliveHumans = alive.filter(p => p.role === 'human');
+    const imamAlive = room.secretImam.alive;
+    const jnounAlive = room.jnoun.alive;
+    
+    // Jnoun wins if Imam is dead OR only 2 players left
+    if (!imamAlive || alive.length <= 2) {
+        endGame(roomCode, 'jnoun', room.jnoun.name, room.secretImam.name);
+        return true;
+    }
+    
+    // Imam wins if Jnoun is eliminated
+    if (!jnounAlive) {
+        endGame(roomCode, 'imam', room.secretImam.name, room.jnoun.name);
+        return true;
+    }
+    
+    return false;
+}
+
+function endGame(roomCode, winner, winnerName, loserName) {
+    const message = winner === 'imam' 
+        ? `الإمام انتصر! - Imam (${winnerName}) wins!`
+        : `الجن انتصر! - Jnoun (${winnerName}) wins!`;
+    
+    broadcastToRoom(roomCode, {
+        type: 'GAME_END',
+        payload: {
+            winner,
+            message,
+            imamName: winnerName,
+            jnounName: loserName
+        }
+    });
+    
+    setTimeout(() => {
+        rooms.delete(roomCode);
+    }, 10000);
 }
 
 function assignTasks(players) {
@@ -216,142 +730,6 @@ function assignTasks(players) {
     });
     
     return taskAssignments;
-}
-
-function transitionToNight(roomCode) {
-    const room = rooms.get(roomCode);
-    if (!room) return;
-    
-    room.phase = 'night';
-    
-    broadcastToRoom(roomCode, {
-        type: 'PHASE_CHANGE',
-        payload: {
-            phase: 'night',
-            message: 'الليل قد حل... عودوا إلى غرفكم'
-        }
-    });
-    
-    // Select players to be possessed based on jnounCount
-    const humanPlayers = Array.from(room.players.values()).filter(p => p.role === 'human' && p.alive);
-    const shuffled = humanPlayers.sort(() => Math.random() - 0.5);
-    const toBePossessed = shuffled.slice(0, room.jnounCount);
-    
-    // Send each player to bedroom
-    setTimeout(() => {
-        const players = Array.from(room.players.values());
-        players.forEach(player => {
-            if (toBePossessed.includes(player)) {
-                // This player will be possessed
-                sendToPlayer(player.ws, {
-                    type: 'ENTER_BEDROOM',
-                    payload: { willBePossessed: true }
-                });
-            } else {
-                // Safe player
-                sendToPlayer(player.ws, {
-                    type: 'ENTER_BEDROOM',
-                    payload: { willBePossessed: false }
-                });
-            }
-        });
-        
-        // After bedroom sequence, possess players
-        setTimeout(() => {
-            possessPlayers(roomCode, toBePossessed);
-        }, 30000); // 30 seconds for bedroom sequence
-        
-    }, 3000);
-}
-
-function possessPlayers(roomCode, players) {
-    const room = rooms.get(roomCode);
-    if (!room) return;
-    
-    players.forEach(player => {
-        player.role = 'jnoun';
-        room.possessedPlayers.push(player.id);
-        
-        sendToPlayer(player.ws, {
-            type: 'POSSESSED',
-            payload: {
-                message: 'أنت الآن جني - You are now a Jnoun'
-            }
-        });
-    });
-    
-    // Transition to next day
-    setTimeout(() => {
-        startNextDay(roomCode);
-    }, 5000);
-}
-
-function startNextDay(roomCode) {
-    const room = rooms.get(roomCode);
-    if (!room) return;
-    
-    room.dayNumber++;
-    room.phase = 'discussion';
-    
-    const alivePlayers = Array.from(room.players.values()).filter(p => p.alive);
-    const jnouns = alivePlayers.filter(p => p.role === 'jnoun');
-    const humans = alivePlayers.filter(p => p.role === 'human');
-    
-    // Check win conditions
-    if (jnouns.length === 0) {
-        endGame(roomCode, 'humans');
-        return;
-    }
-    
-    if (jnouns.length >= humans.length) {
-        endGame(roomCode, 'jnouns');
-        return;
-    }
-    
-    broadcastToRoom(roomCode, {
-        type: 'PHASE_CHANGE',
-        payload: {
-            phase: 'discussion',
-            dayNumber: room.dayNumber,
-            message: `اليوم ${room.dayNumber} - المناقشة`
-        }
-    });
-    
-    // Discussion phase - 90 seconds
-    setTimeout(() => {
-        startVoting(roomCode);
-    }, 90000);
-}
-
-function startVoting(roomCode) {
-    const room = rooms.get(roomCode);
-    if (!room) return;
-    
-    room.phase = 'voting';
-    
-    const alivePlayers = Array.from(room.players.values())
-        .filter(p => p.alive)
-        .map(p => ({ id: p.id, name: p.name }));
-    
-    broadcastToRoom(roomCode, {
-        type: 'START_VOTING',
-        payload: { players: alivePlayers }
-    });
-}
-
-function endGame(roomCode, winner) {
-    broadcastToRoom(roomCode, {
-        type: 'GAME_END',
-        payload: {
-            winner: winner,
-            message: winner === 'humans' ? 'الإنس انتصروا! - Humans Win!' : 'الجن انتصروا! - Jnouns Win!'
-        }
-    });
-    
-    // Clean up room after 10 seconds
-    setTimeout(() => {
-        rooms.delete(roomCode);
-    }, 10000);
 }
 
 function updatePlayerState(ws, payload) {
