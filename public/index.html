@@ -22,7 +22,7 @@
             width: 100%;
             height: 100%;
             display: none;
-            cursor: crosshair;
+            cursor: none;
         }
 
         #gameCanvas.active { display: block; }
@@ -33,6 +33,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            padding: 20px;
         }
 
         .lobby-card {
@@ -142,6 +143,123 @@
             text-shadow: 0 0 10px rgba(78, 204, 163, 0.5);
         }
 
+        /* ESC MENU */
+        #escMenu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+
+        #escMenu.active {
+            display: flex;
+        }
+
+        .menu-panel {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 90%;
+            border: 2px solid rgba(78, 204, 163, 0.3);
+        }
+
+        .menu-header {
+            font-size: 2.5em;
+            text-align: center;
+            margin-bottom: 30px;
+            color: #4ecca3;
+        }
+
+        .menu-section {
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .menu-section h3 {
+            color: #4ecca3;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+
+        .setting-label {
+            font-size: 1.1em;
+        }
+
+        .toggle-btn {
+            padding: 8px 20px;
+            background: #4ecca3;
+            color: #1a1a2e;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .toggle-btn:hover {
+            background: #3db88a;
+        }
+
+        .toggle-btn.active {
+            background: #ff6b6b;
+        }
+
+        .slider {
+            width: 200px;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            outline: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4ecca3;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #4ecca3;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .btn-danger {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #ff5252;
+        }
+
         #hud {
             position: fixed;
             top: 0;
@@ -193,6 +311,7 @@
             border-radius: 10px;
             border: 2px solid #4ecca3;
             max-width: 300px;
+            pointer-events: none;
         }
 
         .task-item {
@@ -215,6 +334,7 @@
             padding: 15px;
             border-radius: 10px;
             font-size: 0.9em;
+            pointer-events: none;
         }
 
         .vignette {
@@ -226,6 +346,18 @@
             pointer-events: none;
             box-shadow: inset 0 0 200px rgba(0, 0, 0, 0.9);
             z-index: 50;
+        }
+
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 4px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
         }
 
         #jumpscare {
@@ -293,26 +425,87 @@
         }
 
         .join-section.active { display: block; }
+
+        .esc-hint {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            color: #4ecca3;
+            pointer-events: none;
+            z-index: 101;
+        }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
 
+    <!-- ESC MENU -->
+    <div id="escMenu">
+        <div class="menu-panel">
+            <div class="menu-header">⚙️ القائمة - Menu</div>
+            
+            <div class="menu-section">
+                <h3>🎮 Controls - التحكم</h3>
+                <div class="setting-item">
+                    <span class="setting-label">Keyboard Layout</span>
+                    <button class="toggle-btn" id="keyboardToggle" onclick="toggleKeyboard()">QWERTY</button>
+                </div>
+                <div class="setting-item">
+                    <span class="setting-label">Mouse Sensitivity</span>
+                    <input type="range" class="slider" id="sensitivitySlider" min="0.5" max="3" step="0.1" value="1">
+                </div>
+            </div>
+
+            <div class="menu-section">
+                <h3>🔊 Audio - الصوت</h3>
+                <div class="setting-item">
+                    <span class="setting-label">Master Volume</span>
+                    <input type="range" class="slider" id="volumeSlider" min="0" max="100" step="1" value="50">
+                </div>
+                <div class="setting-item">
+                    <span class="setting-label">Sound Effects</span>
+                    <button class="toggle-btn active" id="sfxToggle" onclick="toggleSFX()">ON</button>
+                </div>
+            </div>
+
+            <div class="menu-section">
+                <h3>📋 Controls Guide</h3>
+                <div style="padding: 10px; line-height: 1.8;">
+                    <div><strong>Move:</strong> <span id="moveKeys">W A S D</span></div>
+                    <div><strong>Look:</strong> Mouse</div>
+                    <div><strong>Sprint:</strong> Shift</div>
+                    <div><strong>Interact:</strong> E</div>
+                    <div><strong>Menu:</strong> ESC</div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="closeMenu()" style="margin-top: 20px;">عودة - Resume</button>
+            <button class="btn btn-danger" onclick="leaveGame()">مغادرة - Leave Game</button>
+        </div>
+    </div>
+
     <div id="hud">
         <div class="vignette"></div>
+        <div class="esc-hint">Press ESC for Menu</div>
         <div class="hud-top">
             <div class="hud-phase" id="hudPhase">🌙 الليل</div>
         </div>
+        <div class="crosshair"></div>
         <div class="hud-message" id="hudMessage"></div>
         <div class="task-list" id="taskList" style="display:none;">
             <h3 style="margin-bottom:10px;">مهامك - Your Tasks</h3>
             <div id="taskItems"></div>
         </div>
         <div class="controls-info" id="controlsInfo">
-            <div>🖱️ Click + Drag - Look Around</div>
-            <div>WASD / Arrows - Move</div>
+            <div>🖱️ Mouse - Look Around</div>
+            <div id="moveKeysDisplay">WASD - Move</div>
             <div>Shift - Sprint</div>
             <div>E - Interact</div>
+            <div>ESC - Menu</div>
         </div>
     </div>
 
@@ -377,6 +570,20 @@
     </div>
 
     <script>
+        // Settings
+        const settings = {
+            keyboardLayout: 'qwerty', // or 'azerty'
+            mouseSensitivity: 1,
+            masterVolume: 0.5,
+            sfxEnabled: true
+        };
+
+        // Key mappings
+        const keyMappings = {
+            qwerty: { forward: 'w', back: 's', left: 'a', right: 'd' },
+            azerty: { forward: 'z', back: 's', left: 'q', right: 'd' }
+        };
+
         // WebSocket connection
         const WS_URL = window.location.origin.replace(/^http/, 'ws');
         let ws = null;
@@ -393,14 +600,16 @@
             tasks: [],
             completedTasks: [],
             canMove: true,
-            willBePossessed: false
+            willBePossessed: false,
+            inGame: false
         };
 
         // Three.js
         let scene, camera, renderer, clock = new THREE.Clock();
-        let keys = {}, mouse = { isDown: false, lastX: 0, lastY: 0 };
+        let keys = {};
         let jnounEntity = null;
         let taskMarkers = [];
+        let pointerLocked = false;
 
         // Connect to WebSocket
         function connectWebSocket() {
@@ -427,6 +636,8 @@
         }
 
         function handleServerMessage(type, payload) {
+            console.log('Received:', type, payload);
+            
             switch(type) {
                 case 'ROOM_CREATED':
                     handleRoomCreated(payload);
@@ -464,6 +675,7 @@
         function sendToServer(type, payload) {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type, payload }));
+                console.log('Sent:', type, payload);
             }
         }
 
@@ -535,15 +747,17 @@
         }
 
         function updatePlayerList(players) {
+            console.log('Updating player list:', players);
             gameState.players = players;
             const container = document.getElementById('playerListItems');
             container.innerHTML = players.map(p => 
-                `<div class="player-item">${p.name} ${p.isHost ? '👑' : ''}</div>`
+                `<div class="player-item">${p.name} ${p.isHost ? '👑' : ''} ${p.id === gameState.playerId ? '(You)' : ''}</div>`
             ).join('');
         }
 
         function handleGameStart(payload) {
             document.getElementById('lobbyScreen').style.display = 'none';
+            gameState.inGame = true;
             initThreeJS();
             gameState.phase = 'day';
             createDayScene();
@@ -616,6 +830,72 @@
             }
         }
 
+        // ESC MENU FUNCTIONS
+        function toggleMenu() {
+            if (!gameState.inGame) return;
+            
+            const menu = document.getElementById('escMenu');
+            const isActive = menu.classList.contains('active');
+            
+            if (isActive) {
+                closeMenu();
+            } else {
+                menu.classList.add('active');
+                if (pointerLocked) {
+                    document.exitPointerLock();
+                }
+            }
+        }
+
+        function closeMenu() {
+            document.getElementById('escMenu').classList.remove('active');
+            if (gameState.inGame && gameState.canMove) {
+                const canvas = document.getElementById('gameCanvas');
+                canvas.requestPointerLock();
+            }
+        }
+
+        function toggleKeyboard() {
+            settings.keyboardLayout = settings.keyboardLayout === 'qwerty' ? 'azerty' : 'qwerty';
+            const btn = document.getElementById('keyboardToggle');
+            btn.textContent = settings.keyboardLayout.toUpperCase();
+            
+            // Update displays
+            const moveKeys = settings.keyboardLayout === 'qwerty' ? 'W A S D' : 'Z Q S D';
+            document.getElementById('moveKeys').textContent = moveKeys;
+            document.getElementById('moveKeysDisplay').textContent = `${moveKeys} - Move`;
+        }
+
+        function toggleSFX() {
+            settings.sfxEnabled = !settings.sfxEnabled;
+            const btn = document.getElementById('sfxToggle');
+            btn.textContent = settings.sfxEnabled ? 'ON' : 'OFF';
+            btn.classList.toggle('active', settings.sfxEnabled);
+        }
+
+        function leaveGame() {
+            if (confirm('Are you sure you want to leave the game?')) {
+                location.reload();
+            }
+        }
+
+        // Update sensitivity
+        document.addEventListener('DOMContentLoaded', () => {
+            const sensitivitySlider = document.getElementById('sensitivitySlider');
+            if (sensitivitySlider) {
+                sensitivitySlider.addEventListener('input', (e) => {
+                    settings.mouseSensitivity = parseFloat(e.target.value);
+                });
+            }
+            
+            const volumeSlider = document.getElementById('volumeSlider');
+            if (volumeSlider) {
+                volumeSlider.addEventListener('input', (e) => {
+                    settings.masterVolume = parseFloat(e.target.value) / 100;
+                });
+            }
+        });
+
         // THREE.JS SETUP
         function initThreeJS() {
             const canvas = document.getElementById('gameCanvas');
@@ -629,30 +909,39 @@
             canvas.classList.add('active');
             document.getElementById('hud').classList.add('active');
             
-            // Mouse controls
-            canvas.addEventListener('mousedown', (e) => {
-                mouse.isDown = true;
-                mouse.lastX = e.clientX;
-                mouse.lastY = e.clientY;
-            });
-            
-            document.addEventListener('mouseup', () => mouse.isDown = false);
-            
-            document.addEventListener('mousemove', (e) => {
-                if (mouse.isDown) {
-                    const deltaX = e.clientX - mouse.lastX;
-                    const deltaY = e.clientY - mouse.lastY;
-                    
-                    camera.rotation.y -= deltaX * 0.003;
-                    camera.rotation.x -= deltaY * 0.003;
-                    camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-                    
-                    mouse.lastX = e.clientX;
-                    mouse.lastY = e.clientY;
+            // POINTER LOCK for mouse look
+            canvas.addEventListener('click', () => {
+                if (gameState.canMove && !document.getElementById('escMenu').classList.contains('active')) {
+                    canvas.requestPointerLock();
                 }
             });
             
-            document.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+            document.addEventListener('pointerlockchange', () => {
+                pointerLocked = document.pointerLockElement === canvas;
+            });
+            
+            // Mouse movement for camera
+            document.addEventListener('mousemove', (e) => {
+                if (!pointerLocked) return;
+                
+                const movementX = e.movementX || 0;
+                const movementY = e.movementY || 0;
+                
+                camera.rotation.y -= movementX * 0.002 * settings.mouseSensitivity;
+                camera.rotation.x -= movementY * 0.002 * settings.mouseSensitivity;
+                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+            });
+            
+            document.addEventListener('keydown', (e) => {
+                keys[e.key.toLowerCase()] = true;
+                
+                // ESC to open menu
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    toggleMenu();
+                }
+            });
+            
             document.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
             
             window.addEventListener('resize', () => {
@@ -685,6 +974,7 @@
                 const wall = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), wallMat);
                 wall.position.set(x,y,z);
                 wall.castShadow = true;
+                wall.receiveShadow = true;
                 scene.add(wall);
             });
             
@@ -695,6 +985,7 @@
             );
             ceiling.rotation.x = Math.PI / 2;
             ceiling.position.y = 4;
+            ceiling.receiveShadow = true;
             scene.add(ceiling);
             
             // Furniture
@@ -706,6 +997,7 @@
                 );
                 cushion.position.set(Math.cos(angle) * 12, 0.25, Math.sin(angle) * 12);
                 cushion.castShadow = true;
+                cushion.receiveShadow = true;
                 scene.add(cushion);
             }
             
@@ -713,9 +1005,11 @@
             const ambient = new THREE.AmbientLight(0x404040, 0.4);
             scene.add(ambient);
             
-            const mainLight = new THREE.PointLight(0xffaa33, 0.8, 25);
-            mainLight.position.set(0, 3.5, 0);
+            const mainLight = new THREE.DirectionalLight(0xffaa33, 0.8);
+            mainLight.position.set(5, 10, 5);
             mainLight.castShadow = true;
+            mainLight.shadow.mapSize.width = 2048;
+            mainLight.shadow.mapSize.height = 2048;
             scene.add(mainLight);
             
             camera.position.set(0, 1.6, 12);
@@ -727,10 +1021,10 @@
 
         function createTaskMarkers() {
             const positions = {
-                lantern: [0, 3, 0],
-                cushion: [-10, 0.5, -10],
-                table: [0, 0.5, 0],
-                door: [14, 1.5, 0],
+                lantern: [0, 2.5, 0],
+                cushion: [-10, 0.8, -10],
+                table: [0, 0.8, 0],
+                door: [13, 1.5, 0],
                 vase: [10, 0.8, 10]
             };
             
@@ -739,13 +1033,13 @@
                 if (!pos) return;
                 
                 const marker = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.3, 16, 16),
+                    new THREE.SphereGeometry(0.4, 16, 16),
                     new THREE.MeshStandardMaterial({
                         color: 0x00ff00,
                         emissive: 0x00ff00,
-                        emissiveIntensity: 0.8,
+                        emissiveIntensity: 1.2,
                         transparent: true,
-                        opacity: 0.6
+                        opacity: 0.7
                     })
                 );
                 marker.position.set(...pos);
@@ -753,6 +1047,12 @@
                 marker.userData.taskName = task.name;
                 marker.userData.startY = pos[1];
                 marker.userData.time = Math.random() * Math.PI * 2;
+                
+                // Add glow light
+                const glowLight = new THREE.PointLight(0x00ff00, 0.8, 5);
+                glowLight.position.set(...pos);
+                scene.add(glowLight);
+                
                 scene.add(marker);
                 taskMarkers.push(marker);
             });
@@ -775,12 +1075,16 @@
                 new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1 })
             );
             floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
             scene.add(floor);
             
             // Walls
             const wallMat = new THREE.MeshStandardMaterial({ color: 0x2a2020, roughness: 0.95 });
             [[0,1.5,-5,8,3,0.3], [-4,1.5,0,0.3,3,10], [4,1.5,0,0.3,3,10]].forEach(([x,y,z,w,h,d]) => {
-                scene.add(new THREE.Mesh(new THREE.BoxGeometry(w,h,d), wallMat).position.set(x,y,z));
+                const wall = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), wallMat);
+                wall.position.set(x,y,z);
+                wall.receiveShadow = true;
+                scene.add(wall);
             });
             
             // Bed
@@ -789,6 +1093,7 @@
                 new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.9 })
             );
             bed.position.set(0, 0.3, -2);
+            bed.castShadow = true;
             scene.add(bed);
             
             // Door with light
@@ -878,7 +1183,6 @@
             
             setTimeout(() => {
                 jumpscare.classList.remove('active');
-                // Player is now possessed - server handles this
             }, 2500);
         }
 
@@ -898,6 +1202,15 @@
             `;
             document.body.appendChild(overlay);
             
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes pulseRed {
+                    0%, 100% { background: radial-gradient(circle, transparent, #000); }
+                    50% { background: radial-gradient(circle, rgba(139, 0, 0, 0.5), #8b0000); }
+                }
+            `;
+            document.head.appendChild(style);
+            
             setTimeout(() => overlay.remove(), 4000);
         }
 
@@ -913,12 +1226,15 @@
             // Animate task markers
             taskMarkers.forEach(marker => {
                 marker.userData.time += delta * 2;
-                marker.position.y = marker.userData.startY + Math.sin(marker.userData.time) * 0.2;
+                marker.position.y = marker.userData.startY + Math.sin(marker.userData.time) * 0.3;
                 
                 // Check proximity
                 const dist = camera.position.distanceTo(marker.position);
-                if (dist < 2 && keys['e']) {
-                    completeTask(marker.userData.taskId);
+                if (dist < 2.5) {
+                    updateHUD('☀️ اليوم الأول', `Press E: ${marker.userData.taskName}`);
+                    if (keys['e']) {
+                        completeTask(marker.userData.taskId);
+                    }
                 }
             });
             
@@ -926,13 +1242,14 @@
         }
 
         function updatePlayerMovement(delta) {
+            const mapping = keyMappings[settings.keyboardLayout];
             const speed = keys['shift'] ? 10 : 5;
             const velocity = new THREE.Vector3();
             
-            if (keys['w'] || keys['arrowup']) velocity.z = -1;
-            if (keys['s'] || keys['arrowdown']) velocity.z = 1;
-            if (keys['a'] || keys['arrowleft']) velocity.x = -1;
-            if (keys['d'] || keys['arrowright']) velocity.x = 1;
+            if (keys[mapping.forward] || keys['arrowup']) velocity.z = -1;
+            if (keys[mapping.back] || keys['arrowdown']) velocity.z = 1;
+            if (keys[mapping.left] || keys['arrowleft']) velocity.x = -1;
+            if (keys[mapping.right] || keys['arrowright']) velocity.x = 1;
             
             velocity.normalize();
             velocity.applyAxisAngle(new THREE.Vector3(0,1,0), camera.rotation.y);
@@ -963,6 +1280,10 @@
         window.joinRoom = joinRoom;
         window.startGame = startGame;
         window.toggleJoinSection = toggleJoinSection;
+        window.toggleKeyboard = toggleKeyboard;
+        window.toggleSFX = toggleSFX;
+        window.closeMenu = closeMenu;
+        window.leaveGame = leaveGame;
     </script>
 </body>
 </html>
