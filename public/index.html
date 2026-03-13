@@ -758,6 +758,10 @@
         function handleGameStart(payload) {
             document.getElementById('lobbyScreen').style.display = 'none';
             gameState.inGame = true;
+            
+            // Initialize sound system
+            soundManager.init();
+            
             initThreeJS();
             gameState.phase = 'day';
             createDayScene();
@@ -816,6 +820,7 @@
         function completeTask(taskId) {
             if (gameState.completedTasks.includes(taskId)) return;
             
+            soundManager.playTaskComplete();
             gameState.completedTasks.push(taskId);
             const taskEl = document.getElementById(`task-${taskId}`);
             if (taskEl) {
@@ -868,6 +873,7 @@
 
         function toggleSFX() {
             settings.sfxEnabled = !settings.sfxEnabled;
+            soundManager.updateSFXVolume();
             const btn = document.getElementById('sfxToggle');
             btn.textContent = settings.sfxEnabled ? 'ON' : 'OFF';
             btn.classList.toggle('active', settings.sfxEnabled);
@@ -892,6 +898,7 @@
             if (volumeSlider) {
                 volumeSlider.addEventListener('input', (e) => {
                     settings.masterVolume = parseFloat(e.target.value) / 100;
+                    soundManager.updateMasterVolume();
                 });
             }
         });
@@ -958,6 +965,9 @@
             clearScene();
             gameState.canMove = true;
             scene.fog = new THREE.Fog(0x0a0505, 5, 30);
+            
+            // Play day music
+            soundManager.playDayMusic();
             
             // Floor
             const floor = new THREE.Mesh(
@@ -1065,6 +1075,10 @@
             scene.fog = new THREE.Fog(0x0a0a0a, 1, 15);
             document.getElementById('breathingOverlay').classList.add('active');
             
+            // Play night music and heartbeat
+            soundManager.playNightMusic();
+            soundManager.playHeartbeat(true); // Accelerated heartbeat
+            
             // Dark room setup
             const ambient = new THREE.AmbientLight(0x1a1a2a, 0.1);
             scene.add(ambient);
@@ -1125,6 +1139,7 @@
         }
 
         function openDoorSlowly(door) {
+            soundManager.playDoorCreak();
             let rotation = 0.15;
             const interval = setInterval(() => {
                 rotation += 0.01;
@@ -1171,6 +1186,7 @@
         }
 
         function triggerJumpscare() {
+            soundManager.playJumpscare();
             const jumpscare = document.getElementById('jumpscare');
             jumpscare.classList.add('active');
             
@@ -1243,7 +1259,8 @@
 
         function updatePlayerMovement(delta) {
             const mapping = keyMappings[settings.keyboardLayout];
-            const speed = keys['shift'] ? 10 : 5;
+            const isSprinting = keys['shift'];
+            const speed = isSprinting ? 10 : 5;
             const velocity = new THREE.Vector3();
             
             if (keys[mapping.forward] || keys['arrowup']) velocity.z = -1;
@@ -1254,6 +1271,17 @@
             velocity.normalize();
             velocity.applyAxisAngle(new THREE.Vector3(0,1,0), camera.rotation.y);
             velocity.multiplyScalar(speed * delta);
+            
+            // Play footstep sounds
+            const isMoving = velocity.length() > 0.01;
+            if (isMoving) {
+                const footstepInterval = isSprinting ? 0.25 : 0.5;
+                const now = clock.getElapsedTime();
+                if (now - soundManager.lastFootstepTime > footstepInterval) {
+                    soundManager.playFootstep(isSprinting);
+                    soundManager.lastFootstepTime = now;
+                }
+            }
             
             camera.position.add(velocity);
             camera.position.x = Math.max(-14, Math.min(14, camera.position.x));
@@ -1275,6 +1303,441 @@
         // Connect on load
         window.addEventListener('load', connectWebSocket);
         
+        // ============================================
+        // SOUND SYSTEM - Procedural Audio Generation
+        // ============================================
+        const soundManager = {
+            audioContext: null,
+            masterGain: null,
+            musicGain: null,
+            sfxGain: null,
+            
+            // Playback tracking
+            currentMusicSource: null,
+            currentHeartbeatOscillator: null,
+            lastFootstepTime: 0,
+            footstepInterval: 0.5,
+            
+            init() {
+                if (this.audioContext) return;
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Master volume control
+                this.masterGain = this.audioContext.createGain();
+                this.masterGain.connect(this.audioContext.destination);
+                
+                // Music channel
+                this.musicGain = this.audioContext.createGain();
+                this.musicGain.connect(this.masterGain);
+                this.musicGain.gain.value = 0.6;
+                
+                // SFX channel
+                this.sfxGain = this.audioContext.createGain();
+                this.sfxGain.connect(this.masterGain);
+                this.sfxGain.gain.value = 0.5;
+                
+                this.updateMasterVolume();
+                this.updateSFXVolume();
+            },
+            
+            updateMasterVolume() {
+                if (this.masterGain) {
+                    this.masterGain.gain.value = settings.masterVolume;
+                }
+            },
+            
+            updateSFXVolume() {
+                if (this.sfxGain) {
+                    this.sfxGain.gain.value = settings.sfxEnabled ? 0.5 : 0;
+                }
+            },
+            
+            // ===== MUSIC PLAYBACK =====
+            playDayMusic() {
+                this.stopAllMusic();
+                this.init();
+                
+                // Create Moroccan ambient loop - calm, peaceful
+                const now = this.audioContext.currentTime;
+                const osc1 = this.audioContext.createOscillator();
+                const osc2 = this.audioContext.createOscillator();
+                const osc3 = this.audioContext.createOscillator();
+                const lfo = this.audioContext.createOscillator();
+                const lfoGain = this.audioContext.createGain();
+                
+                osc1.type = 'sine';
+                osc2.type = 'sine';
+                osc3.type = 'triangle';
+                lfo.type = 'sine';
+                lfo.frequency.value = 0.5;
+                
+                osc1.frequency.value = 110; // A2
+                osc2.frequency.value = 165; // E3
+                osc3.frequency.value = 82;  // E2
+                
+                lfoGain.gain.value = 50;
+                lfo.connect(lfoGain);
+                lfoGain.connect(osc1.frequency);
+                
+                const gain1 = this.audioContext.createGain();
+                const gain2 = this.audioContext.createGain();
+                const gain3 = this.audioContext.createGain();
+                
+                gain1.gain.setValueAtTime(0.15, now);
+                gain2.gain.setValueAtTime(0.1, now);
+                gain3.gain.setValueAtTime(0.08, now);
+                
+                osc1.connect(gain1);
+                osc2.connect(gain2);
+                osc3.connect(gain3);
+                
+                gain1.connect(this.musicGain);
+                gain2.connect(this.musicGain);
+                gain3.connect(this.musicGain);
+                
+                osc1.start(now);
+                osc2.start(now);
+                osc3.start(now);
+                lfo.start(now);
+                
+                // Loop indefinitely
+                osc1.stop(now + 10000);
+                osc2.stop(now + 10000);
+                osc3.stop(now + 10000);
+                lfo.stop(now + 10000);
+                
+                this.currentMusicSource = { osc1, osc2, osc3, lfo, gain1, gain2, gain3 };
+            },
+            
+            playNightMusic() {
+                this.stopAllMusic();
+                this.init();
+                
+                // Create tense, eerie, scary night music
+                const now = this.audioContext.currentTime;
+                const osc1 = this.audioContext.createOscillator();
+                const osc2 = this.audioContext.createOscillator();
+                const noiseNode = this.audioContext.createBufferSource();
+                const lfo = this.audioContext.createOscillator();
+                const lfoGain = this.audioContext.createGain();
+                
+                // Minor chord progression (A-F#-D)
+                osc1.type = 'square';
+                osc2.type = 'sawtooth';
+                lfo.type = 'sine';
+                
+                osc1.frequency.value = 55;  // A1
+                osc2.frequency.value = 92.5; // F#2
+                lfo.frequency.value = 0.2;
+                
+                lfoGain.gain.value = 30;
+                lfo.connect(lfoGain);
+                lfoGain.connect(osc1.frequency);
+                
+                const gain1 = this.audioContext.createGain();
+                const gain2 = this.audioContext.createGain();
+                const filter = this.audioContext.createBiquadFilter();
+                
+                filter.type = 'lowpass';
+                filter.frequency.value = 200;
+                
+                gain1.gain.setValueAtTime(0.12, now);
+                gain2.gain.setValueAtTime(0.1, now);
+                
+                osc1.connect(gain1);
+                osc2.connect(gain2);
+                gain1.connect(filter);
+                gain2.connect(filter);
+                filter.connect(this.musicGain);
+                
+                osc1.start(now);
+                osc2.start(now);
+                lfo.start(now);
+                
+                // Fade oscillations to create tension
+                let time = now;
+                for (let i = 0; i < 20; i++) {
+                    gain1.gain.setValueAtTime(0.12 + (i * 0.02), time);
+                    time += 0.5;
+                }
+                
+                osc1.stop(now + 10000);
+                osc2.stop(now + 10000);
+                lfo.stop(now + 10000);
+                
+                this.currentMusicSource = { osc1, osc2, lfo, gain1, gain2, filter };
+            },
+            
+            playHeartbeat(accelerated = false) {
+                this.init();
+                if (this.currentHeartbeatOscillator) {
+                    try {
+                        this.currentHeartbeatOscillator.stop();
+                    } catch (e) {}
+                }
+                
+                const bpm = accelerated ? 140 : 80;
+                const beatDuration = 60 / bpm;
+                const now = this.audioContext.currentTime;
+                
+                const playBeat = () => {
+                    const osc = this.audioContext.createOscillator();
+                    const gain = this.audioContext.createGain();
+                    
+                    osc.type = 'sine';
+                    osc.frequency.value = 80;
+                    
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.sfxGain);
+                    
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                    
+                    this.currentHeartbeatOscillator = osc;
+                    
+                    setTimeout(() => playBeat(), beatDuration * 1000);
+                };
+                
+                playBeat();
+            },
+            
+            // ===== SFX PLAYBACK =====
+            playFootstep(isSprinting = false) {
+                if (!settings.sfxEnabled) return;
+                this.init();
+                
+                const now = this.audioContext.currentTime;
+                const noise = this.audioContext.createBufferSource();
+                const filter = this.audioContext.createBiquadFilter();
+                const gainNode = this.audioContext.createGain();
+                
+                // Create white noise buffer
+                const bufferSize = this.audioContext.sampleRate * 0.1;
+                const noiseBuffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+                
+                filter.type = 'highpass';
+                filter.frequency.value = 1000;
+                
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + (isSprinting ? 0.08 : 0.12));
+                
+                noise.buffer = noiseBuffer;
+                noise.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(this.sfxGain);
+                
+                noise.start(now);
+                noise.stop(now + (isSprinting ? 0.08 : 0.12));
+            },
+            
+            playDoorCreak() {
+                if (!settings.sfxEnabled) return;
+                this.init();
+                
+                const now = this.audioContext.currentTime;
+                const osc = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                const lfo = this.audioContext.createOscillator();
+                const lfoGain = this.audioContext.createGain();
+                
+                osc.type = 'sine';
+                lfo.type = 'sine';
+                
+                osc.frequency.value = 300;
+                lfo.frequency.value = 2;
+                lfoGain.gain.value = 150;
+                
+                lfo.connect(lfoGain);
+                lfoGain.connect(osc.frequency);
+                
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+                
+                osc.connect(gainNode);
+                gainNode.connect(this.sfxGain);
+                
+                osc.start(now);
+                lfo.start(now);
+                osc.stop(now + 1.5);
+                lfo.stop(now + 1.5);
+            },
+            
+            playJumpscare() {
+                if (!settings.sfxEnabled) return;
+                this.init();
+                
+                // Loud startling scream/shriek
+                const now = this.audioContext.currentTime;
+                const osc1 = this.audioContext.createOscillator();
+                const osc2 = this.audioContext.createOscillator();
+                const noise = this.audioContext.createBufferSource();
+                const gainNode = this.audioContext.createGain();
+                const filter = this.audioContext.createBiquadFilter();
+                
+                // Create noise buffer
+                const bufferSize = this.audioContext.sampleRate * 0.8;
+                const noiseBuffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+                
+                osc1.type = 'sine';
+                osc2.type = 'square';
+                osc1.frequency.value = 400;
+                osc2.frequency.value = 600;
+                
+                // Frequency sweep
+                osc1.frequency.setValueAtTime(600, now);
+                osc1.frequency.exponentialRampToValueAtTime(200, now + 0.8);
+                
+                filter.type = 'highpass';
+                filter.frequency.value = 300;
+                
+                gainNode.gain.setValueAtTime(0.5, now);
+                gainNode.gain.exponentialRampToValueAtTime(0, now + 0.8);
+                
+                const gain1 = this.audioContext.createGain();
+                const gain2 = this.audioContext.createGain();
+                const noiseGain = this.audioContext.createGain();
+                
+                gain1.gain.value = 0.4;
+                gain2.gain.value = 0.3;
+                noiseGain.gain.value = 0.5;
+                
+                osc1.connect(gain1);
+                osc2.connect(gain2);
+                noise.buffer = noiseBuffer;
+                noise.connect(noiseGain);
+                
+                gain1.connect(filter);
+                gain2.connect(filter);
+                noiseGain.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(this.sfxGain);
+                
+                osc1.start(now);
+                osc2.start(now);
+                noise.start(now);
+                
+                osc1.stop(now + 0.8);
+                osc2.stop(now + 0.8);
+                noise.stop(now + 0.8);
+            },
+            
+            playTaskComplete() {
+                if (!settings.sfxEnabled) return;
+                this.init();
+                
+                // Satisfying completion chord
+                const now = this.audioContext.currentTime;
+                const osc1 = this.audioContext.createOscillator();
+                const osc2 = this.audioContext.createOscillator();
+                const osc3 = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                
+                osc1.type = 'sine';
+                osc2.type = 'sine';
+                osc3.type = 'sine';
+                
+                // Major chord (C-E-G)
+                osc1.frequency.value = 262; // C
+                osc2.frequency.value = 330; // E
+                osc3.frequency.value = 392; // G
+                
+                const gain1 = this.audioContext.createGain();
+                const gain2 = this.audioContext.createGain();
+                const gain3 = this.audioContext.createGain();
+                
+                gain1.gain.value = 0.15;
+                gain2.gain.value = 0.15;
+                gain3.gain.value = 0.15;
+                
+                gainNode.gain.setValueAtTime(1, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                
+                osc1.connect(gain1);
+                osc2.connect(gain2);
+                osc3.connect(gain3);
+                gain1.connect(gainNode);
+                gain2.connect(gainNode);
+                gain3.connect(gainNode);
+                gainNode.connect(this.sfxGain);
+                
+                osc1.start(now);
+                osc2.start(now);
+                osc3.start(now);
+                osc1.stop(now + 0.6);
+                osc2.stop(now + 0.6);
+                osc3.stop(now + 0.6);
+            },
+            
+            playAmbientNightSounds() {
+                if (!settings.sfxEnabled) return;
+                this.init();
+                
+                // Wind whispers and ambient sounds
+                const playWind = () => {
+                    const now = this.audioContext.currentTime;
+                    const noise = this.audioContext.createBufferSource();
+                    const filter = this.audioContext.createBiquadFilter();
+                    const gainNode = this.audioContext.createGain();
+                    
+                    // Create wind noise buffer
+                    const bufferSize = this.audioContext.sampleRate * 3;
+                    const noiseBuffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+                    const output = noiseBuffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        output[i] = Math.random() * 2 - 1;
+                    }
+                    
+                    filter.type = 'lowpass';
+                    filter.frequency.value = 300;
+                    
+                    gainNode.gain.setValueAtTime(0, now);
+                    gainNode.gain.linearRampToValueAtTime(0.2, now + 1);
+                    gainNode.gain.linearRampToValueAtTime(0, now + 3);
+                    
+                    noise.buffer = noiseBuffer;
+                    noise.connect(filter);
+                    filter.connect(gainNode);
+                    gainNode.connect(this.sfxGain);
+                    
+                    noise.start(now);
+                    
+                    setTimeout(playWind, Math.random() * 4000 + 3000);
+                };
+                
+                playWind();
+            },
+            
+            stopAllMusic() {
+                try {
+                    if (this.currentMusicSource) {
+                        const { osc1, osc2, osc3, lfo } = this.currentMusicSource;
+                        if (osc1) osc1.stop();
+                        if (osc2) osc2.stop();
+                        if (osc3) osc3.stop();
+                        if (lfo) lfo.stop();
+                    }
+                    if (this.currentHeartbeatOscillator) {
+                        this.currentHeartbeatOscillator.stop();
+                    }
+                } catch (e) {
+                    // Already stopped
+                }
+                this.currentMusicSource = null;
+                this.currentHeartbeatOscillator = null;
+            }
+        };
+
         // Expose functions
         window.createRoom = createRoom;
         window.joinRoom = joinRoom;
