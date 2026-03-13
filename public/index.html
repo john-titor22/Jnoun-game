@@ -863,6 +863,18 @@
                 case 'WAKE_UP':
                     handleWakeUp(payload);
                     break;
+                case 'SELECT_COMMAND':
+                    showCommandSelectionMenu(payload);
+                    break;
+                case 'COMMAND_SELECTED':
+                    handleCommandConfirmation(payload);
+                    break;
+                case 'ANNOUNCE_COMMAND_REMINDER':
+                    showCommandReminder(payload);
+                    break;
+                case 'EXECUTION_PHASE':
+                    handleExecutionPhase(payload);
+                    break;
                 case 'TRANSFORMATION':
                     handleTransformation(payload);
                     break;
@@ -2857,7 +2869,160 @@ function handlePlayerDeath(payload) {
             document.getElementById('hudMessage').textContent = message;
         }
 
-        // Connect on load
+        function showCommandSelectionMenu(data) {
+            const { role, title, description, commands } = data;
+            const roleColor = role === 'imam' ? '#4ecca3' : '#ff6b6b';
+            
+            const menu = document.createElement('div');
+            menu.id = 'commandSelectionMenu';
+            menu.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0, 0, 0, 0.98);
+                padding: 40px;
+                border-radius: 20px;
+                border: 3px solid ${roleColor};
+                z-index: 10000;
+                max-width: 700px;
+                max-height: 80vh;
+                overflow-y: auto;
+            `;
+            
+            menu.innerHTML = `
+                <h2 style="color: ${roleColor}; text-align: center; margin-bottom: 15px; font-size: 2em;">
+                    ${title}
+                </h2>
+                <p style="text-align: center; color: #ccc; margin-bottom: 30px; line-height: 1.6;">
+                    ${description}
+                </p>
+                <div style="margin-bottom: 20px; padding: 15px; background: rgba(255, 200, 0, 0.1); border-radius: 10px; border-left: 4px solid #ffcc00;">
+                    <strong style="color: #ffcc00;">💡 Strategy Tip:</strong><br>
+                    You'll announce this in <strong>Discord voice chat</strong> when Day 2 starts. Be convincing!
+                </div>
+                <div id="commandOptions">
+                    ${commands.map(cmd => `
+                        <div onclick="selectCommand('${cmd.id}')" style="
+                            padding: 20px;
+                            margin: 15px 0;
+                            background: rgba(255, 255, 255, 0.05);
+                            border: 2px solid ${roleColor};
+                            border-radius: 12px;
+                            cursor: pointer;
+                            transition: all 0.3s;
+                        " onmouseover="this.style.background='rgba(${role === 'imam' ? '78, 204, 163' : '255, 107, 107'}, 0.2)'"
+                           onmouseout="this.style.background='rgba(255, 255, 255, 0.05)'">
+                            <div style="font-size: 1.3em; font-weight: bold; color: ${roleColor}; margin-bottom: 8px;">
+                                ${cmd.text}
+                            </div>
+                            <div style="font-size: 1.05em; color: white; margin-bottom: 5px;">
+                                ${cmd.textEn}
+                            </div>
+                            ${cmd.hint ? `
+                                <div style="font-size: 0.85em; color: #ff9; margin-top: 8px; font-style: italic;">
+                                    ${cmd.hint}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            
+            document.body.appendChild(menu);
+        }
+
+        function selectCommand(commandId) {
+            console.log('Selected command:', commandId);
+            
+            sendToServer('SELECT_COMMAND', {
+                roomCode: gameState.roomCode,
+                commandId: commandId
+            });
+        }
+
+        function handleCommandConfirmation(data) {
+            // Remove selection menu
+            const menu = document.getElementById('commandSelectionMenu');
+            if (menu) menu.remove();
+            
+            updateHUD('✅ تم الاختيار', data.message);
+        }
+
+        function showCommandReminder(data) {
+            const { role, command, message } = data;
+            const roleColor = role === 'imam' ? '#4ecca3' : '#ff6b6b';
+            
+            const reminder = document.createElement('div');
+            reminder.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0, 0, 0, 0.95);
+                padding: 50px;
+                border-radius: 20px;
+                border: 3px solid ${roleColor};
+                z-index: 8000;
+                text-align: center;
+                min-width: 500px;
+                animation: pulse-border 2s ease-in-out infinite;
+            `;
+            
+            reminder.innerHTML = `
+                <div style="font-size: 3em; margin-bottom: 20px;">
+                    ${role === 'imam' ? '🕌' : '👹'}
+                </div>
+                <h2 style="color: ${roleColor}; font-size: 2em; margin-bottom: 20px;">
+                    ${message}
+                </h2>
+                <div style="background: rgba(255, 255, 255, 0.1); padding: 25px; border-radius: 15px; margin-bottom: 20px;">
+                    <div style="font-size: 1.8em; font-weight: bold; color: white; margin-bottom: 10px;">
+                        ${command.text}
+                    </div>
+                    <div style="font-size: 1.2em; color: #ccc;">
+                        ${command.textEn}
+                    </div>
+                </div>
+                <p style="color: #ffcc00; font-size: 1.1em; margin: 0;">
+                    🎤 Announce this now in Discord voice chat!
+                </p>
+                <button onclick="closeCommandReminder()" style="
+                    margin-top: 25px;
+                    padding: 15px 40px;
+                    background: ${roleColor};
+                    border: none;
+                    border-radius: 10px;
+                    color: white;
+                    font-size: 1.1em;
+                    cursor: pointer;
+                    font-weight: bold;
+                ">Got It!</button>
+            `;
+            
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes pulse-border {
+                    0%, 100% { border-color: ${roleColor}; }
+                    50% { border-color: transparent; }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            document.body.appendChild(reminder);
+        }
+
+        function closeCommandReminder() {
+            const reminders = document.querySelectorAll('[style*="pulse-border"]');
+            reminders.forEach(r => r.remove());
+        }
+
+        function handleExecutionPhase(data) {
+            updateHUD('👂 استمع للأوامر', 'Listen to commands in voice chat and choose who to follow');
+        }
+
+        window.selectCommand = selectCommand;
+        window.closeCommandReminder = closeCommandReminder;
         window.addEventListener('load', connectWebSocket);
         
         // ============================================

@@ -69,6 +69,9 @@ function handleMessage(ws, data) {
         case 'PLAYER_VOTE':
             handlePlayerVote(ws, payload);
             break;
+        case 'SELECT_COMMAND':
+            handleCommandSelection(ws, payload);
+            break;
         default:
             console.log('Unknown message type:', type);
     }
@@ -284,27 +287,37 @@ function transformRandomPlayerToJnoun(roomCode) {
             type: 'TRANSFORMATION',
             payload: {
                 role: 'jnoun',
-                message: 'أنت الآن جني! - You are now Jnoun! Guide players to darkness to mark them for death.'
+                message: 'أنت الآن جني! - You are now Jnoun!'
             }
         });
+        
+        // SEND COMMAND SELECTION MENU TO JNOUN (after transformation)
+        setTimeout(() => {
+            sendCommandSelectionToJnoun(room.jnoun);
+        }, 3000);
+        
     }, 15000);
     
-    // Reveal to Imam at same time as Jnoun possession starts
+    // Reveal to Imam
     sendToPlayer(room.secretImam.ws, {
         type: 'TRANSFORMATION',
         payload: {
             role: 'imam',
-            message: 'أنت الإمام! - You are the Imam! Guide players to safety to protect them.'
+            message: 'أنت الإمام! - You are the Imam!'
         }
     });
     
-    // Update Imam's actual role
     room.secretImam.role = 'imam';
     
-    // Wake everyone for Day 2 after possession completes
+    // SEND COMMAND SELECTION MENU TO IMAM (right after reveal)
+    setTimeout(() => {
+        sendCommandSelectionToImam(room.secretImam);
+    }, 3000);
+    
+    // Wake everyone for Day 2 after both have chosen (or timeout)
     setTimeout(() => {
         wakeUpForDay2(roomCode);
-    }, 20000);
+    }, 45000);
 }
 
 function wakeUpForDay2(roomCode) {
@@ -312,7 +325,7 @@ function wakeUpForDay2(roomCode) {
     room.phase = 'day';
     room.dayNumber = 2;
     
-    // Clear bedroom scene and move to salon
+    // Wake everyone up in salon
     broadcastToRoom(roomCode, {
         type: 'WAKE_UP',
         payload: {
@@ -323,10 +336,223 @@ function wakeUpForDay2(roomCode) {
         }
     });
     
-    // Start command phase after players gather
+    // After players gather, show reminder to Imam and Jnoun
     setTimeout(() => {
-        startCommandPhase(roomCode);
-    }, 13000);
+        // Remind Imam of their command
+        if (room.imamSelectedCommand) {
+            sendToPlayer(room.secretImam.ws, {
+                type: 'ANNOUNCE_COMMAND_REMINDER',
+                payload: {
+                    role: 'imam',
+                    command: room.imamSelectedCommand.command,
+                    message: '📢 Time to announce your command in voice chat!'
+                }
+            });
+        }
+        
+        // Remind Jnoun of their command
+        if (room.jnounSelectedCommand) {
+            sendToPlayer(room.jnoun.ws, {
+                type: 'ANNOUNCE_COMMAND_REMINDER',
+                payload: {
+                    role: 'jnoun',
+                    command: room.jnounSelectedCommand.command,
+                    message: '📢 Time to announce your command in voice chat! Make it convincing.'
+                }
+            });
+        }
+        
+        // Start execution phase (players follow commands)
+        startExecutionPhase(roomCode);
+        
+    }, 10000);
+}
+
+function startExecutionPhase(roomCode) {
+    const room = rooms.get(roomCode);
+    room.phase = 'execution';
+    
+    // Broadcast that command phase has started
+    broadcastToRoom(roomCode, {
+        type: 'EXECUTION_PHASE',
+        payload: {
+            message: 'Listen to the commands and choose who to follow',
+            duration: 90000
+        }
+    });
+    
+    // After 90 seconds, start discussion
+    setTimeout(() => {
+        startDiscussionPhase(roomCode);
+    }, 90000);
+}
+
+function sendCommandSelectionToImam(imam) {
+    sendToPlayer(imam.ws, {
+        type: 'SELECT_COMMAND',
+        payload: {
+            role: 'imam',
+            title: 'اختر أمرًا للغد - Choose Tomorrow\'s Command',
+            description: 'Choose a command to guide believers to safety. You will announce this in voice chat when Day 2 starts.',
+            commands: [
+                {
+                    id: 'pray_together',
+                    text: 'صلاة جماعية - Group Prayer',
+                    textEn: 'Everyone pray together in prayer room',
+                    location: 'prayer_room'
+                },
+                {
+                    id: 'stay_courtyard',
+                    text: 'ابقوا في الفناء - Stay in Courtyard',
+                    textEn: 'Everyone stay in courtyard together',
+                    location: 'courtyard'
+                },
+                {
+                    id: 'gather_salon',
+                    text: 'اجتمعوا في الصالون - Gather in Salon',
+                    textEn: 'Everyone gather in salon',
+                    location: 'salon'
+                },
+                {
+                    id: 'light_candles',
+                    text: 'أشعلوا الشموع - Light Candles',
+                    textEn: 'Light candles in all rooms',
+                    location: 'all_rooms'
+                },
+                {
+                    id: 'recite_quran',
+                    text: 'تلاوة القرآن - Recite Quran',
+                    textEn: 'Recite Quran together in courtyard',
+                    location: 'courtyard'
+                },
+                {
+                    id: 'avoid_upstairs',
+                    text: 'تجنبوا الطابق العلوي - Avoid Upstairs',
+                    textEn: 'Stay on ground floor, avoid upper rooms',
+                    location: 'ground_floor'
+                }
+            ]
+        }
+    });
+}
+
+function sendCommandSelectionToJnoun(jnoun) {
+    sendToPlayer(jnoun.ws, {
+        type: 'SELECT_COMMAND',
+        payload: {
+            role: 'jnoun',
+            title: 'اختر أمرًا للغد - Choose Tomorrow\'s Command',
+            description: 'Choose a command to lure believers to danger. Make it sound helpful. You will announce this in voice chat when Day 2 starts.',
+            commands: [
+                {
+                    id: 'pray_together',
+                    text: 'صلاة جماعية - Group Prayer',
+                    textEn: 'Everyone pray together in prayer room',
+                    location: 'prayer_room',
+                    hint: '(Trick: You can interrupt prayer)'
+                },
+                {
+                    id: 'stay_courtyard',
+                    text: 'ابقوا في الفناء - Stay in Courtyard',
+                    textEn: 'Everyone stay in courtyard together',
+                    location: 'courtyard',
+                    hint: '(Trick: Open sky makes them vulnerable)'
+                },
+                {
+                    id: 'gather_salon',
+                    text: 'اجتمعوا في الصالون - Gather in Salon',
+                    textEn: 'Everyone gather in salon',
+                    location: 'salon',
+                    hint: '(Trick: Easy to isolate someone)'
+                },
+                {
+                    id: 'explore_upstairs',
+                    text: 'تفقدوا الطابق العلوي - Check Upstairs',
+                    textEn: 'Check upper floor for problems',
+                    location: 'upstairs',
+                    hint: '(Trick: Isolation and darkness)'
+                },
+                {
+                    id: 'search_basement',
+                    text: 'ابحثوا في القبو - Search Basement',
+                    textEn: 'Investigate strange noise in basement',
+                    location: 'basement',
+                    hint: '(Trick: Most dangerous area)'
+                },
+                {
+                    id: 'split_pairs',
+                    text: 'ابحثوا في أزواج - Search in Pairs',
+                    textEn: 'Split up in pairs to search house',
+                    location: 'split',
+                    hint: '(Trick: Divide and conquer)'
+                }
+            ]
+        }
+    });
+}
+
+function handleCommandSelection(ws, payload) {
+    const { roomCode, commandId } = payload;
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    
+    const player = room.players.get(ws.playerId);
+    if (!player) return;
+    
+    if (player.role === 'imam') {
+        const imamCommands = [
+            { id: 'pray_together', text: 'صلاة جماعية - Group Prayer', textEn: 'Everyone pray together in prayer room' },
+            { id: 'stay_courtyard', text: 'ابقوا في الفناء - Stay in Courtyard', textEn: 'Everyone stay in courtyard together' },
+            { id: 'gather_salon', text: 'اجتمعوا في الصالون - Gather in Salon', textEn: 'Everyone gather in salon' },
+            { id: 'light_candles', text: 'أشعلوا الشموع - Light Candles', textEn: 'Light candles in all rooms' },
+            { id: 'recite_quran', text: 'تلاوة القرآن - Recite Quran', textEn: 'Recite Quran together in courtyard' },
+            { id: 'avoid_upstairs', text: 'تجنبوا الطابق العلوي - Avoid Upstairs', textEn: 'Stay on ground floor, avoid upper rooms' }
+        ];
+        const selectedCommand = imamCommands.find(cmd => cmd.id === commandId);
+        
+        room.imamSelectedCommand = {
+            playerId: player.id,
+            playerName: player.name,
+            commandId: commandId,
+            command: selectedCommand
+        };
+        
+        console.log(`Imam selected: ${commandId}`);
+        
+        sendToPlayer(player.ws, {
+            type: 'COMMAND_SELECTED',
+            payload: {
+                message: '✅ Command selected. You will announce this when Day 2 starts.'
+            }
+        });
+        
+    } else if (player.role === 'jnoun') {
+        const jnounCommands = [
+            { id: 'pray_together', text: 'صلاة جماعية - Group Prayer', textEn: 'Everyone pray together in prayer room', hint: '(Trick: You can interrupt prayer)' },
+            { id: 'stay_courtyard', text: 'ابقوا في الفناء - Stay in Courtyard', textEn: 'Everyone stay in courtyard together', hint: '(Trick: Open sky makes them vulnerable)' },
+            { id: 'gather_salon', text: 'اجتمعوا في الصالون - Gather in Salon', textEn: 'Everyone gather in salon', hint: '(Trick: Easy to isolate someone)' },
+            { id: 'explore_upstairs', text: 'تفقدوا الطابق العلوي - Check Upstairs', textEn: 'Check upper floor for problems', hint: '(Trick: Isolation and darkness)' },
+            { id: 'search_basement', text: 'ابحثوا في القبو - Search Basement', textEn: 'Investigate strange noise in basement', hint: '(Trick: Most dangerous area)' },
+            { id: 'split_pairs', text: 'ابحثوا في أزواج - Search in Pairs', textEn: 'Split up in pairs to search house', hint: '(Trick: Divide and conquer)' }
+        ];
+        const selectedCommand = jnounCommands.find(cmd => cmd.id === commandId);
+        
+        room.jnounSelectedCommand = {
+            playerId: player.id,
+            playerName: player.name,
+            commandId: commandId,
+            command: selectedCommand
+        };
+        
+        console.log(`Jnoun selected: ${commandId}`);
+        
+        sendToPlayer(player.ws, {
+            type: 'COMMAND_SELECTED',
+            payload: {
+                message: '✅ Command selected. You will announce this when Day 2 starts.'
+            }
+        });
+    }
 }
 
 // Command templates for dual commanders
