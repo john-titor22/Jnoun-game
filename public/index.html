@@ -782,7 +782,14 @@
         function handleRoleAssigned(payload) {
             gameState.role = payload.role;
             gameState.tasks = payload.tasks || [];
+            console.log('Role assigned:', gameState.role, 'Tasks:', gameState.tasks);
             displayTasks();
+            
+            // Re-create task markers if game already started and we're in day phase
+            if (gameState.inGame && gameState.phase === 'day' && taskMarkers.length === 0) {
+                console.log('Creating task markers after role assignment');
+                createTaskMarkers();
+            }
         }
 
         function handlePhaseChange(payload) {
@@ -970,8 +977,8 @@
         function createPlayerCharacter(color = 0x4ecca3) {
             const character = new THREE.Group();
             
-            // Body
-            const bodyGeom = new THREE.CapsuleGeometry(0.25, 0.8, 4, 8);
+            // Body (cylinder)
+            const bodyGeom = new THREE.CylinderGeometry(0.25, 0.25, 0.8, 8);
             const bodyMat = new THREE.MeshStandardMaterial({
                 color: color,
                 roughness: 0.8
@@ -1006,8 +1013,8 @@
             rightEye.position.set(0.08, 1.55, 0.18);
             character.add(rightEye);
             
-            // Arms
-            const armGeom = new THREE.CapsuleGeometry(0.08, 0.6, 4, 8);
+            // Arms (cylinders)
+            const armGeom = new THREE.CylinderGeometry(0.08, 0.08, 0.6, 8);
             const armMat = new THREE.MeshStandardMaterial({
                 color: color,
                 roughness: 0.8
@@ -1025,8 +1032,8 @@
             rightArm.castShadow = true;
             character.add(rightArm);
             
-            // Legs
-            const legGeom = new THREE.CapsuleGeometry(0.1, 0.7, 4, 8);
+            // Legs (cylinders)
+            const legGeom = new THREE.CylinderGeometry(0.1, 0.1, 0.7, 8);
             const legMat = new THREE.MeshStandardMaterial({
                 color: 0x2a2a2a, // Dark pants
                 roughness: 0.9
@@ -1453,6 +1460,12 @@
         }
 
         function createTaskMarkers() {
+            // Only create if we have tasks
+            if (!gameState.tasks || gameState.tasks.length === 0) {
+                console.log('No tasks to create markers for');
+                return;
+            }
+            
             const positions = {
                 lantern: [15, 3, 0],        // On wall, upper balcony
                 cushion: [-12, 0.5, -12],   // Ground floor corner
@@ -1463,7 +1476,10 @@
             
             gameState.tasks.forEach(task => {
                 const pos = positions[task.location];
-                if (!pos) return;
+                if (!pos) {
+                    console.log('No position for task:', task.location);
+                    return;
+                }
                 
                 const marker = new THREE.Mesh(
                     new THREE.SphereGeometry(0.5, 16, 16),
@@ -1480,6 +1496,7 @@
                 marker.userData.taskName = task.name;
                 marker.userData.startY = pos[1];
                 marker.userData.time = Math.random() * Math.PI * 2;
+                marker.castShadow = true;
                 
                 // Add bright glow light
                 const glowLight = new THREE.PointLight(0x00ff00, 1.5, 8);
@@ -1488,7 +1505,10 @@
                 
                 scene.add(marker);
                 taskMarkers.push(marker);
+                console.log('Created task marker:', task.name, 'at position', pos);
             });
+            
+            console.log('Total task markers created:', taskMarkers.length);
         }
 
         // BEDROOM SCENE
