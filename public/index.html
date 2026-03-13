@@ -617,6 +617,38 @@
             inGame: false
         };
 
+        // Riad architecture configuration
+        const RIAD_CONFIG = {
+            courtyard: {
+                width: 12,
+                length: 12
+            },
+            building: {
+                width: 24,
+                length: 24,
+                wallThickness: 0.5,
+                floorHeight: 3.5,
+                floors: 2
+            },
+            rooms: {
+                groundFloor: [
+                    { name: 'Salon', x: -9, z: -9, width: 6, depth: 6, door: { x: -6, z: -9, facing: 'south' } },
+                    { name: 'Kitchen', x: 3, z: -9, width: 6, depth: 6, door: { x: 6, z: -9, facing: 'south' } },
+                    { name: 'Library', x: -9, z: 3, width: 6, depth: 6, door: { x: -9, z: 6, facing: 'east' } },
+                    { name: 'Prayer Room', x: 3, z: 3, width: 6, depth: 6, door: { x: 6, z: 6, facing: 'west' } }
+                ],
+                upperFloor: [
+                    { name: 'Bedroom 1', x: -9, z: -9, width: 6, depth: 6, door: { x: -6, z: -9, facing: 'south' } },
+                    { name: 'Bedroom 2', x: 3, z: -9, width: 6, depth: 6, door: { x: 6, z: -9, facing: 'south' } },
+                    { name: 'Bedroom 3', x: -9, z: 3, width: 6, depth: 6, door: { x: -9, z: 6, facing: 'east' } },
+                    { name: 'Bedroom 4', x: 3, z: 3, width: 6, depth: 6, door: { x: 6, z: 6, facing: 'west' } }
+                ]
+            },
+            doors: [],
+            walls: [],
+            stairs: []
+        };
+
         // Three.js
         let scene, camera, renderer, clock = new THREE.Clock();
         let keys = {};
@@ -1266,301 +1298,496 @@
             animate();
         }
 
-        // DAY SCENE
-        function createDayScene() {
+        // ==================== RIAD STRUCTURE FUNCTIONS ====================
+        function createRiadStructure() {
             clearScene();
+            
+            const { building, courtyard } = RIAD_CONFIG;
+            
+            // Reset interactive objects
+            RIAD_CONFIG.doors = [];
+            RIAD_CONFIG.walls = [];
+            RIAD_CONFIG.stairs = [];
+            
+            // GROUND FLOOR
+            createGroundFloor();
+            
+            // UPPER FLOOR
+            createUpperFloor();
+            
+            // COURTYARD (open center)
+            createCourtyard();
+            
+            // STAIRCASES
+            createStaircases();
+            
+            // EXTERIOR WALLS
+            createExteriorWalls();
+            
+            // LIGHTING
+            setupRiadLighting();
+            
+            // Set camera to ground floor, courtyard entrance
+            camera.position.set(0, 1.6, 10);
+            camera.rotation.set(0, Math.PI, 0);
+            
             gameState.canMove = true;
-            
-            // DARK CLAUSTROPHOBIC FOG
-            scene.fog = new THREE.Fog(0x1a1510, 3, 25);
-            
-            // Play day music (with creepy ambient)
-            soundManager.playDayMusic();
-            
-            // ==================== COURTYARD FLOOR - DARK ====================
-            const floor = new THREE.Mesh(
-                new THREE.PlaneGeometry(40, 40),
-                new THREE.MeshStandardMaterial({ 
-                    color: 0x3a2a1a, // Dark brown
-                    roughness: 0.95 
-                })
-            );
+        }
+
+        function createGroundFloor() {
+            const floorGeom = new THREE.PlaneGeometry(RIAD_CONFIG.building.width, RIAD_CONFIG.building.length);
+            const floorMat = new THREE.MeshStandardMaterial({
+                color: 0x3a2a1a,
+                roughness: 0.95
+            });
+            const floor = new THREE.Mesh(floorGeom, floorMat);
             floor.rotation.x = -Math.PI / 2;
             floor.receiveShadow = true;
             scene.add(floor);
             
-            // BLOOD STAINS ON FLOOR - creepy detail
-            for (let i = 0; i < 8; i++) {
-                const stainGeom = new THREE.CircleGeometry(0.5 + Math.random() * 0.8, 16);
-                const stainMat = new THREE.MeshStandardMaterial({
-                    color: 0x2a0a0a,
-                    roughness: 0.9,
-                    transparent: true,
-                    opacity: 0.7
-                });
-                const stain = new THREE.Mesh(stainGeom, stainMat);
-                stain.rotation.x = -Math.PI / 2;
-                stain.position.set(
-                    (Math.random() - 0.5) * 30,
-                    0.01,
-                    (Math.random() - 0.5) * 30
-                );
-                scene.add(stain);
-            }
-            
-            // ==================== CENTRAL FOUNTAIN ====================
-            const fountainGeom = new THREE.CylinderGeometry(1.5, 1.8, 0.4, 8);
-            const fountainMat = new THREE.MeshStandardMaterial({
-                color: 0x3a6a66, // Darker fountain
-                roughness: 0.6,
-                metalness: 0.1
+            // Create ground floor rooms
+            RIAD_CONFIG.rooms.groundFloor.forEach(room => {
+                createRoom(room, 0);
             });
-            const fountain = new THREE.Mesh(fountainGeom, fountainMat);
-            fountain.position.set(0, 0.2, 0);
-            fountain.castShadow = true;
-            fountain.receiveShadow = true;
-            scene.add(fountain);
+        }
+
+        function createUpperFloor() {
+            const floorY = RIAD_CONFIG.building.floorHeight;
+            const platformWidth = (RIAD_CONFIG.building.width - RIAD_CONFIG.courtyard.width) / 2;
             
-            const waterGeom = new THREE.CylinderGeometry(1.3, 1.3, 0.1, 8);
-            const waterMat = new THREE.MeshStandardMaterial({
-                color: 0x1a2a22,
-                transparent: true,
-                opacity: 0.8,
-                roughness: 0.1,
-                metalness: 0.3
+            // North platform
+            createPlatform(0, floorY, -RIAD_CONFIG.courtyard.length/2 - platformWidth/2, RIAD_CONFIG.building.width, platformWidth);
+            
+            // South platform
+            createPlatform(0, floorY, RIAD_CONFIG.courtyard.length/2 + platformWidth/2, RIAD_CONFIG.building.width, platformWidth);
+            
+            // East platform
+            createPlatform(RIAD_CONFIG.courtyard.width/2 + platformWidth/2, floorY, 0, platformWidth, RIAD_CONFIG.courtyard.length);
+            
+            // West platform
+            createPlatform(-RIAD_CONFIG.courtyard.width/2 - platformWidth/2, floorY, 0, platformWidth, RIAD_CONFIG.courtyard.length);
+            
+            // Create upper floor rooms
+            RIAD_CONFIG.rooms.upperFloor.forEach(room => {
+                createRoom(room, floorY);
             });
-            const water = new THREE.Mesh(waterGeom, waterMat);
-            water.position.set(0, 0.4, 0);
-            scene.add(water);
             
-            const tileRing = new THREE.RingGeometry(1.9, 3.5, 8);
-            const tileMat = new THREE.MeshStandardMaterial({
-                color: 0x5a3513,
+            // Balcony railing around courtyard
+            createBalconyRailing(floorY);
+        }
+
+        function createPlatform(x, y, z, width, depth) {
+            const platformGeom = new THREE.BoxGeometry(width, 0.3, depth);
+            const platformMat = new THREE.MeshStandardMaterial({
+                color: 0x4a3a2a,
+                roughness: 0.9
+            });
+            const platform = new THREE.Mesh(platformGeom, platformMat);
+            platform.position.set(x, y, z);
+            platform.receiveShadow = true;
+            platform.castShadow = true;
+            scene.add(platform);
+        }
+
+        function createBalconyRailing(floorY) {
+            const railingHeight = 1;
+            const railingMat = new THREE.MeshStandardMaterial({
+                color: 0x2a1a0a,
                 roughness: 0.8
             });
-            const tiles = new THREE.Mesh(tileRing, tileMat);
-            tiles.rotation.x = -Math.PI / 2;
-            tiles.position.y = 0.01;
-            tiles.receiveShadow = true;
-            scene.add(tiles);
             
-            // ==================== SURROUNDING WALLS - DARK & WEATHERED ====================
-            const wallMat = new THREE.MeshStandardMaterial({ 
-                color: 0x4a3a2a, // Very dark weathered plaster
-                roughness: 0.95,
-                metalness: 0
-            });
-            
-            const wallData = [
-                { x: 0, z: -20, w: 40, h: 8, d: 0.8 },
-                { x: 0, z: 20, w: 40, h: 8, d: 0.8 },
-                { x: -20, z: 0, w: 0.8, h: 8, d: 40 },
-                { x: 20, z: 0, w: 0.8, h: 8, d: 40 }
+            const courtyardHalf = RIAD_CONFIG.courtyard.width / 2;
+            const postPositions = [
+                // North side
+                ...Array.from({length: 8}, (_, i) => [-courtyardHalf + i * 1.5, floorY + railingHeight/2, -courtyardHalf]),
+                // South side
+                ...Array.from({length: 8}, (_, i) => [-courtyardHalf + i * 1.5, floorY + railingHeight/2, courtyardHalf]),
+                // East side
+                ...Array.from({length: 8}, (_, i) => [courtyardHalf, floorY + railingHeight/2, -courtyardHalf + i * 1.5]),
+                // West side
+                ...Array.from({length: 8}, (_, i) => [-courtyardHalf, floorY + railingHeight/2, -courtyardHalf + i * 1.5])
             ];
             
-            wallData.forEach(data => {
-                const wall = new THREE.Mesh(
-                    new THREE.BoxGeometry(data.w, data.h, data.d),
-                    wallMat
+            postPositions.forEach(([x, y, z]) => {
+                const post = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.05, 0.05, railingHeight, 8),
+                    railingMat
                 );
-                wall.position.set(data.x, data.h / 2, data.z);
+                post.position.set(x, y, z);
+                post.castShadow = true;
+                scene.add(post);
+            });
+        }
+
+        function createCourtyard() {
+            const courtyardFloor = new THREE.Mesh(
+                new THREE.PlaneGeometry(RIAD_CONFIG.courtyard.width, RIAD_CONFIG.courtyard.length),
+                new THREE.MeshStandardMaterial({
+                    color: 0x8B6914,
+                    roughness: 0.8
+                })
+            );
+            courtyardFloor.rotation.x = -Math.PI / 2;
+            courtyardFloor.position.y = 0.01;
+            courtyardFloor.receiveShadow = true;
+            scene.add(courtyardFloor);
+            
+            const fountain = new THREE.Mesh(
+                new THREE.CylinderGeometry(1.5, 1.8, 0.5, 8),
+                new THREE.MeshStandardMaterial({
+                    color: 0x6B8E86,
+                    roughness: 0.6
+                })
+            );
+            fountain.position.set(0, 0.25, 0);
+            fountain.castShadow = true;
+            scene.add(fountain);
+        }
+
+        function createRoom(roomConfig, floorY) {
+            const { x, z, width, depth, door, name } = roomConfig;
+            const wallHeight = RIAD_CONFIG.building.floorHeight - 0.3;
+            const wallThickness = RIAD_CONFIG.building.wallThickness;
+            
+            const wallMat = new THREE.MeshStandardMaterial({
+                color: 0x4a3a2a,
+                roughness: 0.95
+            });
+            
+            // Room floor
+            const roomFloor = new THREE.Mesh(
+                new THREE.PlaneGeometry(width, depth),
+                new THREE.MeshStandardMaterial({
+                    color: 0x3a2a1a,
+                    roughness: 0.95
+                })
+            );
+            roomFloor.rotation.x = -Math.PI / 2;
+            roomFloor.position.set(x, floorY + 0.01, z);
+            roomFloor.receiveShadow = true;
+            scene.add(roomFloor);
+            
+            // Room ceiling
+            const ceiling = new THREE.Mesh(
+                new THREE.PlaneGeometry(width, depth),
+                new THREE.MeshStandardMaterial({
+                    color: 0x2a1a0a,
+                    roughness: 0.95
+                })
+            );
+            ceiling.rotation.x = Math.PI / 2;
+            ceiling.position.set(x, floorY + wallHeight, z);
+            ceiling.receiveShadow = true;
+            scene.add(ceiling);
+            
+            // Create all four walls with door opening
+            createRoomWalls(x, z, width, depth, floorY, wallHeight, wallThickness, door, wallMat);
+            
+            // Create the door
+            createDoor(door, floorY, wallHeight, name);
+        }
+
+        function createRoomWalls(x, z, width, depth, floorY, height, thickness, doorConfig, material) {
+            const doorWidth = 1.2;
+            const doorFacing = doorConfig.facing;
+            
+            // North wall
+            if (doorFacing !== 'north') {
+                const wall = new THREE.Mesh(
+                    new THREE.BoxGeometry(width, height, thickness),
+                    material
+                );
+                wall.position.set(x, floorY + height/2, z - depth/2);
                 wall.castShadow = true;
                 wall.receiveShadow = true;
                 scene.add(wall);
-            });
-            
-            // ADD CRACKS IN WALLS
-            function addWallCracks() {
-                const crackMat = new THREE.MeshStandardMaterial({
-                    color: 0x0a0a0a,
-                    roughness: 1,
-                    transparent: true,
-                    opacity: 0.8
-                });
-                
-                for (let i = 0; i < 12; i++) {
-                    const crack = new THREE.Mesh(
-                        new THREE.PlaneGeometry(0.1, 1 + Math.random() * 2),
-                        crackMat
-                    );
-                    
-                    const wall = Math.floor(Math.random() * 4);
-                    if (wall === 0) {
-                        crack.position.set((Math.random() - 0.5) * 28, 1 + Math.random() * 2, -14.9);
-                    } else if (wall === 1) {
-                        crack.position.set((Math.random() - 0.5) * 28, 1 + Math.random() * 2, 14.9);
-                        crack.rotation.y = Math.PI;
-                    } else if (wall === 2) {
-                        crack.position.set(14.9, 1 + Math.random() * 2, (Math.random() - 0.5) * 28);
-                        crack.rotation.y = -Math.PI / 2;
-                    } else {
-                        crack.position.set(-14.9, 1 + Math.random() * 2, (Math.random() - 0.5) * 28);
-                        crack.rotation.y = Math.PI / 2;
-                    }
-                    
-                    crack.rotation.z = (Math.random() - 0.5) * 0.5;
-                    scene.add(crack);
-                }
-            }
-            addWallCracks();
-            
-            // HANGING CHAINS - ominous
-            for (let i = 0; i < 3; i++) {
-                const chainGeom = new THREE.CylinderGeometry(0.05, 0.05, 2, 8);
-                const chainMat = new THREE.MeshStandardMaterial({
-                    color: 0x1a1a1a,
-                    roughness: 0.7,
-                    metalness: 0.8
-                });
-                const chain = new THREE.Mesh(chainGeom, chainMat);
-                chain.position.set(
-                    (Math.random() - 0.5) * 20,
-                    3,
-                    (Math.random() - 0.5) * 20
-                );
-                chain.castShadow = true;
-                
-                // Store chain reference for animation
-                chain.userData.swayindex = i;
-                chain.userData.isChain = true;
-                
-                scene.add(chain);
+                RIAD_CONFIG.walls.push(wall);
+            } else {
+                createWallWithGap(x, floorY, z - depth/2, width, height, thickness, doorConfig.x, doorWidth, material, 'horizontal');
             }
             
-            // ==================== ARCHED DOORWAYS & WINDOWS ====================
-            function createArch(x, z, width, height, depth) {
-                const archGroup = new THREE.Group();
-                const archMat = new THREE.MeshStandardMaterial({
-                    color: 0x3a3a2a, // Darker arches
-                    roughness: 0.9
-                });
-                
-                const archCurve = new THREE.EllipseCurve(0, 0, width / 2, height / 2, 0, Math.PI, false);
-                const points = archCurve.getPoints(12);
-                const archGeom = new THREE.TubeGeometry(
-                    new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(p.x, p.y, 0))),
-                    8, 0.2, 3, false
+            // South wall
+            if (doorFacing !== 'south') {
+                const wall = new THREE.Mesh(
+                    new THREE.BoxGeometry(width, height, thickness),
+                    material
                 );
-                const arch = new THREE.Mesh(archGeom, archMat);
-                arch.castShadow = true;
-                archGroup.add(arch);
-                
-                archGroup.position.set(x, height / 2 + 0.5, z);
-                return archGroup;
+                wall.position.set(x, floorY + height/2, z + depth/2);
+                wall.castShadow = true;
+                wall.receiveShadow = true;
+                scene.add(wall);
+                RIAD_CONFIG.walls.push(wall);
+            } else {
+                createWallWithGap(x, floorY, z + depth/2, width, height, thickness, doorConfig.x, doorWidth, material, 'horizontal');
             }
             
-            [-12, 0, 12].forEach(pos => scene.add(createArch(pos, -19.5, 3, 3.5, 0.8)));
-            [-12, 0, 12].forEach(pos => scene.add(createArch(pos, 19.5, 3, 3.5, 0.8)));
-            
-            // ==================== DECORATIVE COLUMNS ====================
-            const columnMat = new THREE.MeshStandardMaterial({
-                color: 0x5a4a3a, // Darker columns
-                roughness: 0.85
-            });
-            
-            const columnPositions = [
-                [-15, -15], [15, -15], [-15, 15], [15, 15]
-            ];
-            
-            columnPositions.forEach(([x, z]) => {
-                const column = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.6, 0.7, 8, 8),
-                    columnMat
+            // East wall
+            if (doorFacing !== 'east') {
+                const wall = new THREE.Mesh(
+                    new THREE.BoxGeometry(thickness, height, depth),
+                    material
                 );
-                column.position.set(x, 4, z);
-                column.castShadow = true;
-                column.receiveShadow = true;
-                scene.add(column);
+                wall.position.set(x + width/2, floorY + height/2, z);
+                wall.castShadow = true;
+                wall.receiveShadow = true;
+                scene.add(wall);
+                RIAD_CONFIG.walls.push(wall);
+            } else {
+                createWallWithGap(x + width/2, floorY, z, depth, height, thickness, doorConfig.z, doorWidth, material, 'vertical');
+            }
+            
+            // West wall
+            if (doorFacing !== 'west') {
+                const wall = new THREE.Mesh(
+                    new THREE.BoxGeometry(thickness, height, depth),
+                    material
+                );
+                wall.position.set(x - width/2, floorY + height/2, z);
+                wall.castShadow = true;
+                wall.receiveShadow = true;
+                scene.add(wall);
+                RIAD_CONFIG.walls.push(wall);
+            } else {
+                createWallWithGap(x - width/2, floorY, z, depth, height, thickness, doorConfig.z, doorWidth, material, 'vertical');
+            }
+        }
+
+        function createWallWithGap(x, floorY, z, length, height, thickness, gapCenter, gapWidth, material, orientation) {
+            const halfGap = (length - gapWidth) / 2;
+            const segment1Length = halfGap - Math.abs(gapCenter - (-length/2));
+            const segment2Length = halfGap - Math.abs(gapCenter - (length/2));
+            
+            if (orientation === 'horizontal') {
+                // Left segment
+                const wall1 = new THREE.Mesh(
+                    new THREE.BoxGeometry(halfGap, height, thickness),
+                    material
+                );
+                wall1.position.set(x - length/2 + halfGap/2, floorY + height/2, z);
+                wall1.castShadow = true;
+                scene.add(wall1);
+                RIAD_CONFIG.walls.push(wall1);
                 
-                const capital = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.75, 0.6, 0.4, 8),
-                    columnMat
+                // Right segment
+                const wall2 = new THREE.Mesh(
+                    new THREE.BoxGeometry(halfGap, height, thickness),
+                    material
                 );
-                capital.position.set(x, 8.2, z);
-                capital.castShadow = true;
-                scene.add(capital);
-            });
+                wall2.position.set(x + length/2 - halfGap/2, floorY + height/2, z);
+                wall2.castShadow = true;
+                scene.add(wall2);
+                RIAD_CONFIG.walls.push(wall2);
+            } else {
+                // Front segment
+                const wall1 = new THREE.Mesh(
+                    new THREE.BoxGeometry(thickness, height, halfGap),
+                    material
+                );
+                wall1.position.set(x, floorY + height/2, z - length/2 + halfGap/2);
+                wall1.castShadow = true;
+                scene.add(wall1);
+                RIAD_CONFIG.walls.push(wall1);
+                
+                // Back segment
+                const wall2 = new THREE.Mesh(
+                    new THREE.BoxGeometry(thickness, height, halfGap),
+                    material
+                );
+                wall2.position.set(x, floorY + height/2, z + length/2 - halfGap/2);
+                wall2.castShadow = true;
+                scene.add(wall2);
+                RIAD_CONFIG.walls.push(wall2);
+            }
+        }
+
+        function createDoor(doorConfig, floorY, wallHeight, roomName) {
+            const doorWidth = 1.2;
+            const doorHeight = 2.2;
+            const doorThickness = 0.1;
             
-            // ==================== UPPER FLOOR BALCONY ====================
-            const balconyMat = new THREE.MeshStandardMaterial({
-                color: 0x3a2a1a, // Very dark wood
+            const doorMat = new THREE.MeshStandardMaterial({
+                color: 0x3a2a1a,
                 roughness: 0.9
             });
             
-            const balconyData = [
-                { x: 0, z: -16, w: 32, h: 0.3, d: 2 },
-                { x: 0, z: 16, w: 32, h: 0.3, d: 2 },
-                { x: -16, z: 0, w: 2, h: 0.3, d: 32 },
-                { x: 16, z: 0, w: 2, h: 0.3, d: 32 }
-            ];
+            const door = new THREE.Mesh(
+                new THREE.BoxGeometry(doorWidth, doorHeight, doorThickness),
+                doorMat
+            );
             
-            balconyData.forEach(data => {
-                const balcony = new THREE.Mesh(
-                    new THREE.BoxGeometry(data.w, data.h, data.d),
-                    balconyMat
-                );
-                balcony.position.set(data.x, 4, data.z);
-                balcony.castShadow = true;
-                balcony.receiveShadow = true;
-                scene.add(balcony);
-            });
+            const { x, z, facing } = doorConfig;
+            door.position.set(x, floorY + doorHeight/2, z);
             
-            // ==================== EERIE LIGHTING ====================
-            // Very dim ambient
-            const ambient = new THREE.AmbientLight(0x2a1a0a, 0.15);
-            scene.add(ambient);
-            
-            // Single dim overhead point light (like flickering bulb)
-            const mainLight = new THREE.PointLight(0xff8833, 0.4, 30);
-            mainLight.position.set(0, 3.5, 0);
-            mainLight.castShadow = true;
-            mainLight.shadow.mapSize.width = 2048;
-            mainLight.shadow.mapSize.height = 2048;
-            scene.add(mainLight);
-            
-            // Store for flickering
-            gameState.mainLight = mainLight;
-            
-            // Flickering wall sconces
-            for (let i = 0; i < 4; i++) {
-                const angle = (i / 4) * Math.PI * 2;
-                const sconceLight = new THREE.SpotLight(0xff8833, 0.3, 15, Math.PI / 6, 0.8);
-                sconceLight.position.set(
-                    Math.cos(angle) * 14,
-                    2.5,
-                    Math.sin(angle) * 14
-                );
-                sconceLight.castShadow = true;
-                scene.add(sconceLight);
-                
-                // Random flicker
-                const flickerInterval = setInterval(() => {
-                    sconceLight.intensity = 0.1 + Math.random() * 0.3;
-                }, 100 + Math.random() * 400);
-                
-                // Store for cleanup
-                if (!gameState.flickerIntervals) gameState.flickerIntervals = [];
-                gameState.flickerIntervals.push(flickerInterval);
+            if (facing === 'east' || facing === 'west') {
+                door.rotation.y = Math.PI / 2;
             }
             
-            // Occasional complete light failure
-            const lightFailInterval = setInterval(() => {
-                if (gameState.phase === 'day' && Math.random() < 0.1) {
-                    mainLight.intensity = 0;
-                    setTimeout(() => {
-                        if (gameState.phase === 'day' && mainLight) {
-                            mainLight.intensity = 0.4;
-                        }
-                    }, 100 + Math.random() * 500);
+            door.castShadow = true;
+            door.userData.isDoor = true;
+            door.userData.isOpen = false;
+            door.userData.roomName = roomName;
+            door.userData.originalRotation = door.rotation.clone();
+            door.userData.facing = facing;
+            door.userData.basePosition = door.position.clone();
+            door.userData.baseRotation = door.rotation.clone();
+            
+            scene.add(door);
+            RIAD_CONFIG.doors.push(door);
+        }
+
+        function createStaircases() {
+            createStaircase(-8, 0, 8, 'north');
+            createStaircase(8, 0, -8, 'south');
+        }
+
+        function createStaircase(x, y, z, direction) {
+            const stepCount = 12;
+            const stepWidth = 2;
+            const stepDepth = 0.8;
+            const stepHeight = RIAD_CONFIG.building.floorHeight / stepCount;
+            
+            const stepMat = new THREE.MeshStandardMaterial({
+                color: 0x3a2a1a,
+                roughness: 0.9
+            });
+            
+            for (let i = 0; i < stepCount; i++) {
+                const step = new THREE.Mesh(
+                    new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth),
+                    stepMat
+                );
+                
+                const zOffset = direction === 'north' ? -i * stepDepth : i * stepDepth;
+                step.position.set(x, y + i * stepHeight + stepHeight/2, z + zOffset);
+                step.castShadow = true;
+                step.receiveShadow = true;
+                scene.add(step);
+                
+                RIAD_CONFIG.stairs.push({
+                    box: new THREE.Box3().setFromObject(step),
+                    height: y + (i + 1) * stepHeight
+                });
+            }
+        }
+
+        function createExteriorWalls() {
+            const { building } = RIAD_CONFIG;
+            const wallHeight = building.floorHeight * building.floors;
+            const wallMat = new THREE.MeshStandardMaterial({
+                color: 0x4a3a2a,
+                roughness: 0.95
+            });
+            
+            const walls = [
+                { w: building.width, h: wallHeight, d: building.wallThickness, x: 0, y: wallHeight/2, z: -building.length/2 },
+                { w: building.width, h: wallHeight, d: building.wallThickness, x: 0, y: wallHeight/2, z: building.length/2 },
+                { w: building.wallThickness, h: wallHeight, d: building.length, x: -building.width/2, y: wallHeight/2, z: 0 },
+                { w: building.wallThickness, h: wallHeight, d: building.length, x: building.width/2, y: wallHeight/2, z: 0 }
+            ];
+            
+            walls.forEach(({ w, h, d, x, y, z }) => {
+                const wall = new THREE.Mesh(
+                    new THREE.BoxGeometry(w, h, d),
+                    wallMat
+                );
+                wall.position.set(x, y, z);
+                wall.castShadow = true;
+                wall.receiveShadow = true;
+                scene.add(wall);
+                RIAD_CONFIG.walls.push(wall);
+            });
+        }
+
+        function setupRiadLighting() {
+            scene.fog = new THREE.Fog(0x1a1510, 5, 35);
+            
+            const ambient = new THREE.AmbientLight(0x2a1a0a, 0.2);
+            scene.add(ambient);
+            
+            const courtyardLight = new THREE.PointLight(0xffaa44, 0.6, 20);
+            courtyardLight.position.set(0, 5, 0);
+            courtyardLight.castShadow = true;
+            courtyardLight.shadow.mapSize.width = 2048;
+            courtyardLight.shadow.mapSize.height = 2048;
+            scene.add(courtyardLight);
+            
+            [...RIAD_CONFIG.rooms.groundFloor, ...RIAD_CONFIG.rooms.upperFloor].forEach((room, i) => {
+                const light = new THREE.PointLight(0xff8833, 0.3, 8);
+                const floorY = i < RIAD_CONFIG.rooms.groundFloor.length ? 0 : RIAD_CONFIG.building.floorHeight;
+                light.position.set(room.x, floorY + 2, room.z);
+                light.castShadow = true;
+                scene.add(light);
+                
+                setInterval(() => {
+                    light.intensity = 0.2 + Math.random() * 0.2;
+                }, 150 + Math.random() * 300);
+            });
+        }
+
+        // ==================== DOOR INTERACTION ====================
+        function checkDoorProximity() {
+            if (!gameState.canMove) return;
+            
+            let nearestDoor = null;
+            let nearestDist = Infinity;
+            
+            RIAD_CONFIG.doors.forEach(door => {
+                const dist = camera.position.distanceTo(door.position);
+                if (dist < nearestDist) {
+                    nearestDist = dist;
+                    nearestDoor = door;
                 }
-            }, 5000);
+            });
             
-            if (!gameState.flickerIntervals) gameState.flickerIntervals = [];
-            gameState.flickerIntervals.push(lightFailInterval);
+            if (nearestDoor && nearestDist < 2.5) {
+                const status = nearestDoor.userData.isOpen ? 'Close' : 'Open';
+                updateHUD('🏠 Riad', `E to ${status} - ${nearestDoor.userData.roomName}`);
+                
+                if (keys['e']) {
+                    toggleDoor(nearestDoor);
+                    keys['e'] = false;
+                }
+            }
+        }
+
+        function toggleDoor(door) {
+            door.userData.isOpen = !door.userData.isOpen;
             
-            // ==================== CAMERA POSITIONING ====================
-            camera.position.set(0, 5, 18);
-            camera.rotation.set(-0.3, 0, 0);
+            if (soundManager && soundManager.playDoorCreak) {
+                soundManager.playDoorCreak();
+            }
+            
+            const targetRotation = door.userData.isOpen ? Math.PI / 2 : 0;
+            animateDoor(door, targetRotation);
+        }
+
+        function animateDoor(door, targetRotation) {
+            const startRotation = door.rotation.y;
+            const duration = 800;
+            const startTime = Date.now();
+            
+            const interval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                const eased = progress < 0.5 
+                    ? 2 * progress * progress 
+                    : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                
+                door.rotation.y = startRotation + (targetRotation - startRotation) * eased;
+                
+                if (progress >= 1) {
+                    clearInterval(interval);
+                }
+            }, 16);
+        }
+
+        // DAY SCENE
+        function createDayScene() {
+            createRiadStructure();
+            
+            // Play day music (with creepy ambient)
+            soundManager.playDayMusic();
             
             // Create task markers
             createTaskMarkers();
@@ -1957,6 +2184,9 @@
                 }
             });
             
+            // Check door proximity for interaction
+            checkDoorProximity();
+            
             renderer.render(scene, camera);
         }
 
@@ -1986,11 +2216,59 @@
                 }
             }
             
+            // Store old position for collision rollback
+            const oldPos = camera.position.clone();
+            
+            // Try to move
             camera.position.add(velocity);
-            // Collision boundaries for courtyard (±18 to stay within 40x40 courtyard)
-            camera.position.x = Math.max(-18, Math.min(18, camera.position.x));
-            camera.position.z = Math.max(-18, Math.min(18, camera.position.z));
-            camera.position.y = 1.6;
+            
+            // Create player collision box
+            const playerBox = new THREE.Box3().setFromCenterAndSize(
+                camera.position,
+                new THREE.Vector3(0.5, 1.6, 0.5)
+            );
+            
+            let collided = false;
+            
+            // Check wall collisions
+            RIAD_CONFIG.walls.forEach(wall => {
+                const wallBox = new THREE.Box3().setFromObject(wall);
+                if (playerBox.intersectsBox(wallBox)) {
+                    collided = true;
+                }
+            });
+            
+            // Check closed door collisions
+            RIAD_CONFIG.doors.forEach(door => {
+                if (!door.userData.isOpen) {
+                    const doorBox = new THREE.Box3().setFromObject(door);
+                    if (playerBox.intersectsBox(doorBox)) {
+                        collided = true;
+                    }
+                }
+            });
+            
+            // If collided, revert position
+            if (collided) {
+                camera.position.copy(oldPos);
+            }
+            
+            // Check stairs for auto-climb
+            RIAD_CONFIG.stairs.forEach(stair => {
+                if (playerBox.intersectsBox(stair.box)) {
+                    camera.position.y = stair.height + 1.6;
+                }
+            });
+            
+            // Clamp to building bounds
+            const bound = RIAD_CONFIG.building.width / 2 - 0.5;
+            camera.position.x = Math.max(-bound, Math.min(bound, camera.position.x));
+            camera.position.z = Math.max(-bound, Math.min(bound, camera.position.z));
+            
+            // Ensure minimum height (ground floor)
+            if (camera.position.y < 1.6) {
+                camera.position.y = 1.6;
+            }
         }
 
         function clearScene() {
