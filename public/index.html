@@ -344,8 +344,20 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
-            box-shadow: inset 0 0 200px rgba(0, 0, 0, 0.9);
+            box-shadow: inset 0 0 300px rgba(0, 0, 0, 0.95);
             z-index: 50;
+        }
+        
+        .film-grain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('data:image/png;base64,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');
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 51;
         }
 
         .crosshair {
@@ -490,6 +502,7 @@
 
     <div id="hud">
         <div class="vignette"></div>
+        <div class="film-grain"></div>
         <div class="esc-hint">Press ESC for Menu</div>
         <div class="hud-top">
             <div class="hud-phase" id="hudPhase">🌙 الليل</div>
@@ -870,6 +883,23 @@
                 console.log('Removed task marker from scene');
             }
             
+            // UNSETTLING MOMENT - Brief scare when completing task
+            setTimeout(() => {
+                // Flickering lights
+                scene.traverse(obj => {
+                    if (obj.isLight) {
+                        const origIntensity = obj.intensity;
+                        obj.intensity = 0;
+                        setTimeout(() => { obj.intensity = origIntensity; }, 200);
+                    }
+                });
+                
+                // Play scary sound
+                if (soundGen) {
+                    soundGen.playDistantCreak(soundGen.context.currentTime);
+                }
+            }, 500);
+            
             // Check if all tasks completed
             const totalTasks = gameState.tasks.length;
             if (gameState.completedTasks.length >= totalTasks) {
@@ -1240,25 +1270,48 @@
         function createDayScene() {
             clearScene();
             gameState.canMove = true;
-            scene.fog = new THREE.Fog(0x87CEEB, 30, 80);
             
-            // Play day music
+            // DARK CLAUSTROPHOBIC FOG
+            scene.fog = new THREE.Fog(0x1a1510, 3, 25);
+            
+            // Play day music (with creepy ambient)
             soundManager.playDayMusic();
             
-            // ==================== COURTYARD FLOOR ====================
+            // ==================== COURTYARD FLOOR - DARK ====================
             const floor = new THREE.Mesh(
                 new THREE.PlaneGeometry(40, 40),
-                new THREE.MeshStandardMaterial({ color: 0xA49A7E, roughness: 0.9 })
+                new THREE.MeshStandardMaterial({ 
+                    color: 0x3a2a1a, // Dark brown
+                    roughness: 0.95 
+                })
             );
             floor.rotation.x = -Math.PI / 2;
             floor.receiveShadow = true;
             scene.add(floor);
             
+            // BLOOD STAINS ON FLOOR - creepy detail
+            for (let i = 0; i < 8; i++) {
+                const stainGeom = new THREE.CircleGeometry(0.5 + Math.random() * 0.8, 16);
+                const stainMat = new THREE.MeshStandardMaterial({
+                    color: 0x2a0a0a,
+                    roughness: 0.9,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                const stain = new THREE.Mesh(stainGeom, stainMat);
+                stain.rotation.x = -Math.PI / 2;
+                stain.position.set(
+                    (Math.random() - 0.5) * 30,
+                    0.01,
+                    (Math.random() - 0.5) * 30
+                );
+                scene.add(stain);
+            }
+            
             // ==================== CENTRAL FOUNTAIN ====================
-            // Octagonal fountain basin
             const fountainGeom = new THREE.CylinderGeometry(1.5, 1.8, 0.4, 8);
             const fountainMat = new THREE.MeshStandardMaterial({
-                color: 0x6B8E86,
+                color: 0x3a6a66, // Darker fountain
                 roughness: 0.6,
                 metalness: 0.1
             });
@@ -1268,12 +1321,11 @@
             fountain.receiveShadow = true;
             scene.add(fountain);
             
-            // Water surface (dark, murky)
             const waterGeom = new THREE.CylinderGeometry(1.3, 1.3, 0.1, 8);
             const waterMat = new THREE.MeshStandardMaterial({
-                color: 0x2C4A42,
+                color: 0x1a2a22,
                 transparent: true,
-                opacity: 0.7,
+                opacity: 0.8,
                 roughness: 0.1,
                 metalness: 0.3
             });
@@ -1281,10 +1333,9 @@
             water.position.set(0, 0.4, 0);
             scene.add(water);
             
-            // Decorative zellige tile ring around fountain
             const tileRing = new THREE.RingGeometry(1.9, 3.5, 8);
             const tileMat = new THREE.MeshStandardMaterial({
-                color: 0x8B4513,
+                color: 0x5a3513,
                 roughness: 0.8
             });
             const tiles = new THREE.Mesh(tileRing, tileMat);
@@ -1293,19 +1344,18 @@
             tiles.receiveShadow = true;
             scene.add(tiles);
             
-            // ==================== SURROUNDING WALLS (2 STORIES) ====================
+            // ==================== SURROUNDING WALLS - DARK & WEATHERED ====================
             const wallMat = new THREE.MeshStandardMaterial({ 
-                color: 0xC4A57B, 
+                color: 0x4a3a2a, // Very dark weathered plaster
                 roughness: 0.95,
                 metalness: 0
             });
             
-            // Wall dimensions: height 8 units (2 stories), thickness 0.8
             const wallData = [
-                { x: 0, z: -20, w: 40, h: 8, d: 0.8 },    // South
-                { x: 0, z: 20, w: 40, h: 8, d: 0.8 },     // North
-                { x: -20, z: 0, w: 0.8, h: 8, d: 40 },    // West
-                { x: 20, z: 0, w: 0.8, h: 8, d: 40 }      // East
+                { x: 0, z: -20, w: 40, h: 8, d: 0.8 },
+                { x: 0, z: 20, w: 40, h: 8, d: 0.8 },
+                { x: -20, z: 0, w: 0.8, h: 8, d: 40 },
+                { x: 20, z: 0, w: 0.8, h: 8, d: 40 }
             ];
             
             wallData.forEach(data => {
@@ -1319,16 +1369,72 @@
                 scene.add(wall);
             });
             
+            // ADD CRACKS IN WALLS
+            function addWallCracks() {
+                const crackMat = new THREE.MeshStandardMaterial({
+                    color: 0x0a0a0a,
+                    roughness: 1,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                for (let i = 0; i < 12; i++) {
+                    const crack = new THREE.Mesh(
+                        new THREE.PlaneGeometry(0.1, 1 + Math.random() * 2),
+                        crackMat
+                    );
+                    
+                    const wall = Math.floor(Math.random() * 4);
+                    if (wall === 0) {
+                        crack.position.set((Math.random() - 0.5) * 28, 1 + Math.random() * 2, -14.9);
+                    } else if (wall === 1) {
+                        crack.position.set((Math.random() - 0.5) * 28, 1 + Math.random() * 2, 14.9);
+                        crack.rotation.y = Math.PI;
+                    } else if (wall === 2) {
+                        crack.position.set(14.9, 1 + Math.random() * 2, (Math.random() - 0.5) * 28);
+                        crack.rotation.y = -Math.PI / 2;
+                    } else {
+                        crack.position.set(-14.9, 1 + Math.random() * 2, (Math.random() - 0.5) * 28);
+                        crack.rotation.y = Math.PI / 2;
+                    }
+                    
+                    crack.rotation.z = (Math.random() - 0.5) * 0.5;
+                    scene.add(crack);
+                }
+            }
+            addWallCracks();
+            
+            // HANGING CHAINS - ominous
+            for (let i = 0; i < 3; i++) {
+                const chainGeom = new THREE.CylinderGeometry(0.05, 0.05, 2, 8);
+                const chainMat = new THREE.MeshStandardMaterial({
+                    color: 0x1a1a1a,
+                    roughness: 0.7,
+                    metalness: 0.8
+                });
+                const chain = new THREE.Mesh(chainGeom, chainMat);
+                chain.position.set(
+                    (Math.random() - 0.5) * 20,
+                    3,
+                    (Math.random() - 0.5) * 20
+                );
+                chain.castShadow = true;
+                
+                // Store chain reference for animation
+                chain.userData.swayindex = i;
+                chain.userData.isChain = true;
+                
+                scene.add(chain);
+            }
+            
             // ==================== ARCHED DOORWAYS & WINDOWS ====================
-            // Create decorative arches for visual interest
             function createArch(x, z, width, height, depth) {
                 const archGroup = new THREE.Group();
                 const archMat = new THREE.MeshStandardMaterial({
-                    color: 0xDEB887,
+                    color: 0x3a3a2a, // Darker arches
                     roughness: 0.9
                 });
                 
-                // Simplified arch using curved geometry
                 const archCurve = new THREE.EllipseCurve(0, 0, width / 2, height / 2, 0, Math.PI, false);
                 const points = archCurve.getPoints(12);
                 const archGeom = new THREE.TubeGeometry(
@@ -1343,26 +1449,15 @@
                 return archGroup;
             }
             
-            // Add arches to walls (decorative)
-            // South wall arches
-            [-12, 0, 12].forEach(pos => {
-                const arch = createArch(pos, -19.5, 3, 3.5, 0.8);
-                scene.add(arch);
-            });
-            
-            // North wall arches
-            [-12, 0, 12].forEach(pos => {
-                const arch = createArch(pos, 19.5, 3, 3.5, 0.8);
-                scene.add(arch);
-            });
+            [-12, 0, 12].forEach(pos => scene.add(createArch(pos, -19.5, 3, 3.5, 0.8)));
+            [-12, 0, 12].forEach(pos => scene.add(createArch(pos, 19.5, 3, 3.5, 0.8)));
             
             // ==================== DECORATIVE COLUMNS ====================
             const columnMat = new THREE.MeshStandardMaterial({
-                color: 0xD2B48C,
+                color: 0x5a4a3a, // Darker columns
                 roughness: 0.85
             });
             
-            // Columns at corners supporting upper structure
             const columnPositions = [
                 [-15, -15], [15, -15], [-15, 15], [15, 15]
             ];
@@ -1377,7 +1472,6 @@
                 column.receiveShadow = true;
                 scene.add(column);
                 
-                // Simple capital (decorative top)
                 const capital = new THREE.Mesh(
                     new THREE.CylinderGeometry(0.75, 0.6, 0.4, 8),
                     columnMat
@@ -1389,16 +1483,15 @@
             
             // ==================== UPPER FLOOR BALCONY ====================
             const balconyMat = new THREE.MeshStandardMaterial({
-                color: 0x6B4423,
+                color: 0x3a2a1a, // Very dark wood
                 roughness: 0.9
             });
             
-            // Balcony walkway around perimeter (at y = 4)
             const balconyData = [
-                { x: 0, z: -16, w: 32, h: 0.3, d: 2 },     // South
-                { x: 0, z: 16, w: 32, h: 0.3, d: 2 },      // North
-                { x: -16, z: 0, w: 2, h: 0.3, d: 32 },     // West
-                { x: 16, z: 0, w: 2, h: 0.3, d: 32 }       // East
+                { x: 0, z: -16, w: 32, h: 0.3, d: 2 },
+                { x: 0, z: 16, w: 32, h: 0.3, d: 2 },
+                { x: -16, z: 0, w: 2, h: 0.3, d: 32 },
+                { x: 16, z: 0, w: 2, h: 0.3, d: 32 }
             ];
             
             balconyData.forEach(data => {
@@ -1412,51 +1505,71 @@
                 scene.add(balcony);
             });
             
-            // ==================== ATMOSPHERIC DETAILS ====================
-            // Weathered/aged look with some vines
-            for (let i = 0; i < 12; i++) {
-                const vine = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.1, 0.08, 3, 4),
-                    new THREE.MeshStandardMaterial({ color: 0x2d5016 })
+            // ==================== EERIE LIGHTING ====================
+            // Very dim ambient
+            const ambient = new THREE.AmbientLight(0x2a1a0a, 0.15);
+            scene.add(ambient);
+            
+            // Single dim overhead point light (like flickering bulb)
+            const mainLight = new THREE.PointLight(0xff8833, 0.4, 30);
+            mainLight.position.set(0, 3.5, 0);
+            mainLight.castShadow = true;
+            mainLight.shadow.mapSize.width = 2048;
+            mainLight.shadow.mapSize.height = 2048;
+            scene.add(mainLight);
+            
+            // Store for flickering
+            gameState.mainLight = mainLight;
+            
+            // Flickering wall sconces
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+                const sconceLight = new THREE.SpotLight(0xff8833, 0.3, 15, Math.PI / 6, 0.8);
+                sconceLight.position.set(
+                    Math.cos(angle) * 14,
+                    2.5,
+                    Math.sin(angle) * 14
                 );
-                const angle = (i / 12) * Math.PI * 2;
-                vine.position.set(Math.cos(angle) * 18, 3 + Math.random() * 2, Math.sin(angle) * 18);
-                vine.rotation.z = Math.random() * 0.5;
-                vine.castShadow = true;
-                scene.add(vine);
+                sconceLight.castShadow = true;
+                scene.add(sconceLight);
+                
+                // Random flicker
+                const flickerInterval = setInterval(() => {
+                    sconceLight.intensity = 0.1 + Math.random() * 0.3;
+                }, 100 + Math.random() * 400);
+                
+                // Store for cleanup
+                if (!gameState.flickerIntervals) gameState.flickerIntervals = [];
+                gameState.flickerIntervals.push(flickerInterval);
             }
             
-            // ==================== LIGHTING ====================
-            // Sunlight from above
-            const sunlight = new THREE.DirectionalLight(0xFFE4B5, 1.2);
-            sunlight.position.set(5, 15, 5);
-            sunlight.castShadow = true;
-            sunlight.shadow.mapSize.width = 4096;
-            sunlight.shadow.mapSize.height = 4096;
-            sunlight.shadow.camera.left = -25;
-            sunlight.shadow.camera.right = 25;
-            sunlight.shadow.camera.top = 25;
-            sunlight.shadow.camera.bottom = -25;
-            sunlight.shadow.camera.far = 40;
-            scene.add(sunlight);
+            // Occasional complete light failure
+            const lightFailInterval = setInterval(() => {
+                if (gameState.phase === 'day' && Math.random() < 0.1) {
+                    mainLight.intensity = 0;
+                    setTimeout(() => {
+                        if (gameState.phase === 'day' && mainLight) {
+                            mainLight.intensity = 0.4;
+                        }
+                    }, 100 + Math.random() * 500);
+                }
+            }, 5000);
             
-            // Fill light (ambient from sky)
-            const skyLight = new THREE.HemisphereLight(0x87CEEB, 0x8B7355, 0.6);
-            scene.add(skyLight);
-            
-            // Soft ambient
-            const ambient = new THREE.AmbientLight(0xC4A57B, 0.4);
-            scene.add(ambient);
+            if (!gameState.flickerIntervals) gameState.flickerIntervals = [];
+            gameState.flickerIntervals.push(lightFailInterval);
             
             // ==================== CAMERA POSITIONING ====================
             camera.position.set(0, 5, 18);
             camera.rotation.set(-0.3, 0, 0);
             
-            // ==================== COLLISION BOUNDARIES ====================
-            // Update collision in game loop (see updatePlayerMovement)
-            
             // Create task markers
             createTaskMarkers();
+            
+            // Start random scare events
+            if (!gameState.scareEventsStarted) {
+                gameState.scareEventsStarted = true;
+                startRandomScareEvents();
+            }
         }
 
         function createTaskMarkers() {
@@ -1509,6 +1622,127 @@
             });
             
             console.log('Total task markers created:', taskMarkers.length);
+        }
+
+        // ========== HORROR SCARE EVENTS ==========
+        let lastScareTime = 0;
+
+        function startRandomScareEvents() {
+            const scareInterval = setInterval(() => {
+                if (!gameState.inGame || (gameState.phase !== 'day' && gameState.phase !== 'tasks')) {
+                    clearInterval(scareInterval);
+                    return;
+                }
+                
+                const now = Date.now();
+                if (now - lastScareTime > 30000 && Math.random() < 0.3) { // 30% chance, min 30 sec apart
+                    triggerRandomScareEvent();
+                }
+            }, 20000);
+        }
+
+        function triggerRandomScareEvent() {
+            const scareType = Math.floor(Math.random() * 5);
+            console.log('SCARE EVENT:', scareType);
+            
+            switch(scareType) {
+                case 0:
+                    createShadowFigure();
+                    break;
+                case 1:
+                    flickerAllLights();
+                    break;
+                case 2:
+                    soundGen.playDistantScream();
+                    break;
+                case 3:
+                    playNameWhisper();
+                    break;
+                case 4:
+                    createPeripheralMovement();
+                    break;
+            }
+            
+            lastScareTime = Date.now();
+        }
+
+        function createShadowFigure() {
+            const shadow = createPlayerCharacter(0x0a0a0a);
+            const positions = [
+                [-12, 0, -12],
+                [12, 0, -12],
+                [-12, 0, 12],
+                [12, 0, 12]
+            ];
+            const pos = positions[Math.floor(Math.random() * positions.length)];
+            shadow.position.set(...pos);
+            scene.add(shadow);
+            
+            console.log('Shadow figure appeared at', pos);
+            
+            setTimeout(() => {
+                scene.remove(shadow);
+            }, 2000);
+        }
+
+        function flickerAllLights() {
+            const lights = [];
+            scene.traverse(obj => {
+                if (obj.isLight) {
+                    lights.push({ light: obj, original: obj.intensity });
+                }
+            });
+            
+            let flickerCount = 0;
+            const flickerInterval = setInterval(() => {
+                lights.forEach(({ light }) => {
+                    light.intensity = flickerCount % 2 === 0 ? 0 : light.original || 0.3;
+                });
+                flickerCount++;
+                
+                if (flickerCount > 8) {
+                    clearInterval(flickerInterval);
+                    lights.forEach(({ light, original }) => {
+                        light.intensity = original;
+                    });
+                }
+            }, 100);
+        }
+
+        function createPeripheralMovement() {
+            const angle = camera.rotation.y + (Math.random() < 0.5 ? Math.PI / 3 : -Math.PI / 3);
+            const dist = 10;
+            
+            const obj = new THREE.Mesh(
+                new THREE.BoxGeometry(0.5, 1.5, 0.5),
+                new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+            );
+            obj.position.set(
+                camera.position.x + Math.sin(angle) * dist,
+                1,
+                camera.position.z + Math.cos(angle) * dist
+            );
+            
+            scene.add(obj);
+            
+            const moveInterval = setInterval(() => {
+                obj.position.y -= 0.1;
+                if (obj.position.y < -2) {
+                    clearInterval(moveInterval);
+                    scene.remove(obj);
+                }
+            }, 30);
+        }
+
+        function playNameWhisper() {
+            updateHUD('👁️', '...هل سمعت ذلك؟');
+            soundGen.playWhisper(soundGen.context.currentTime);
+            
+            setTimeout(() => {
+                if (gameState.phase === 'day') {
+                    updateHUD('☀️ اليوم الأول', 'أكمل مهامك');
+                }
+            }, 3000);
         }
 
         // BEDROOM SCENE
@@ -1945,33 +2179,149 @@
             
             startDayAmbience() {
                 this.stopAmbience();
+                
+                // Low ominous drone even during day
+                try {
+                    this.dayDrone = this.context.createOscillator();
+                    const droneGain = this.context.createGain();
+                    
+                    this.dayDrone.type = 'sine';
+                    this.dayDrone.frequency.setValueAtTime(110, this.context.currentTime); // Low A
+                    
+                    droneGain.gain.setValueAtTime(0.08 * settings.masterVolume, this.context.currentTime);
+                    
+                    this.dayDrone.connect(droneGain);
+                    droneGain.connect(this.context.destination);
+                    this.dayDrone.start();
+                } catch (e) {}
+                
+                // Random disturbing sounds
                 this.dayInterval = setInterval(() => {
                     if (gameState.phase !== 'day' && gameState.phase !== 'tasks') {
                         this.stopAmbience();
                         return;
                     }
-                    try {
-                        const notes = [261, 293, 329, 392, 440]; // C, D, E, G, A
-                        const note = notes[Math.floor(Math.random() * notes.length)];
-                        const now = this.context.currentTime;
-                        const osc = this.context.createOscillator();
-                        const gain = this.context.createGain();
-                        
-                        osc.type = 'sine';
-                        osc.frequency.value = note;
-                        
-                        gain.gain.setValueAtTime(0, now);
-                        gain.gain.linearRampToValueAtTime(0.05 * settings.masterVolume, now + 0.5);
-                        gain.gain.setValueAtTime(0.05 * settings.masterVolume, now + 2);
-                        gain.gain.linearRampToValueAtTime(0, now + 3);
-                        
-                        osc.connect(gain);
-                        gain.connect(this.context.destination);
-                        
-                        osc.start(now);
-                        osc.stop(now + 3);
-                    } catch (e) {}
-                }, 4000 + Math.random() * 3000);
+                    
+                    const soundType = Math.random();
+                    const now = this.context.currentTime;
+                    
+                    if (soundType < 0.3) {
+                        this.playWaterDrip(now);
+                    } else if (soundType < 0.6) {
+                        this.playDistantCreak(now);
+                    } else {
+                        this.playWhispering(now);
+                    }
+                }, 3000 + Math.random() * 7000);
+            }
+            
+            playWaterDrip(time) {
+                try {
+                    const osc = this.context.createOscillator();
+                    const gain = this.context.createGain();
+                    
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(800, time);
+                    osc.frequency.exponentialRampToValueAtTime(200, time + 0.05);
+                    
+                    gain.gain.setValueAtTime(0.15 * settings.masterVolume, time);
+                    gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.context.destination);
+                    
+                    osc.start(time);
+                    osc.stop(time + 0.1);
+                } catch (e) {}
+            }
+            
+            playDistantCreak(time) {
+                try {
+                    const osc = this.context.createOscillator();
+                    const gain = this.context.createGain();
+                    const filter = this.context.createBiquadFilter();
+                    
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150 + Math.random() * 50, time);
+                    osc.frequency.linearRampToValueAtTime(100, time + 1.5);
+                    
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(600, time);
+                    
+                    gain.gain.setValueAtTime(0, time);
+                    gain.gain.linearRampToValueAtTime(0.1 * settings.masterVolume, time + 0.3);
+                    gain.gain.setValueAtTime(0.1 * settings.masterVolume, time + 1);
+                    gain.gain.linearRampToValueAtTime(0, time + 1.5);
+                    
+                    osc.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.context.destination);
+                    
+                    osc.start(time);
+                    osc.stop(time + 1.5);
+                } catch (e) {}
+            }
+            
+            playWhispering(time) {
+                try {
+                    const bufferSize = this.context.sampleRate * 2;
+                    const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = (Math.random() * 2 - 1) * 0.5;
+                    }
+                    
+                    const noise = this.context.createBufferSource();
+                    noise.buffer = buffer;
+                    
+                    const filter = this.context.createBiquadFilter();
+                    filter.type = 'bandpass';
+                    filter.frequency.setValueAtTime(2000 + Math.random() * 1000, time);
+                    filter.Q.setValueAtTime(10, time);
+                    
+                    const gain = this.context.createGain();
+                    gain.gain.setValueAtTime(0, time);
+                    gain.gain.linearRampToValueAtTime(0.05 * settings.masterVolume, time + 0.5);
+                    gain.gain.setValueAtTime(0.05 * settings.masterVolume, time + 1.5);
+                    gain.gain.linearRampToValueAtTime(0, time + 2);
+                    
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.context.destination);
+                    
+                    noise.start(time);
+                } catch (e) {}
+            }
+            
+            playDistantScream() {
+                if (!settings.sfxEnabled) return;
+                try {
+                    const now = this.context.currentTime;
+                    const duration = 1.2;
+                    
+                    const osc = this.context.createOscillator();
+                    const gain = this.context.createGain();
+                    const filter = this.context.createBiquadFilter();
+                    
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(600, now);
+                    osc.frequency.exponentialRampToValueAtTime(200, now + duration);
+                    
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(1500, now);
+                    
+                    gain.gain.setValueAtTime(0, now);
+                    gain.gain.linearRampToValueAtTime(0.08 * settings.masterVolume, now + 0.2);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+                    
+                    osc.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.context.destination);
+                    
+                    osc.start(now);
+                    osc.stop(now + duration);
+                } catch (e) {}
             }
             
             startNightAmbience() {
