@@ -666,6 +666,12 @@
                 case 'GAME_END':
                     handleGameEnd(payload);
                     break;
+                case 'PLAYER_UPDATE':
+                    updateOtherPlayer(payload);
+                    break;
+                case 'PLAYER_LEFT':
+                    handlePlayerLeft(payload);
+                    break;
                 case 'ERROR':
                     showStatus(payload.message);
                     break;
@@ -783,6 +789,10 @@
             soundManager.init();
             
             initThreeJS();
+            
+            // Start position broadcasting
+            positionBroadcastInterval = setInterval(broadcastPlayerPosition, 100);
+            
             gameState.phase = 'day';
             createDayScene();
             updateHUD('☀️ اليوم الأول', 'الجميع بشر - أكمل مهامك');
@@ -801,7 +811,10 @@
 
         function handleEnterBedroom(payload) {
             gameState.willBePossessed = payload.willBePossessed;
-            createBedroomScene();
+            // Delay to sync all players entering bedroom
+            setTimeout(() => {
+                createBedroomScene();
+            }, 1000);
         }
 
         function handlePossession(payload) {
@@ -922,6 +935,75 @@
                 });
             }
         });
+
+        // MULTIPLAYER PLAYER TRACKING
+        const otherPlayers = new Map();
+        let positionBroadcastInterval = null;
+
+        function broadcastPlayerPosition() {
+            if (!gameState.inGame || !gameState.canMove) return;
+            
+            sendToServer('PLAYER_STATE', {
+                roomCode: gameState.roomCode,
+                position: {
+                    x: camera.position.x,
+                    y: camera.position.y,
+                    z: camera.position.z
+                },
+                rotation: {
+                    x: camera.rotation.x,
+                    y: camera.rotation.y
+                }
+            });
+        }
+
+        function updateOtherPlayer(data) {
+            if (data.playerId === gameState.playerId) return;
+            
+            let playerEntity = otherPlayers.get(data.playerId);
+            
+            if (!playerEntity) {
+                // Create new player cylinder
+                const geometry = new THREE.CylinderGeometry(0.3, 0.3, 1.6, 8);
+                const material = new THREE.MeshStandardMaterial({
+                    color: 0x4ecca3,
+                    emissive: 0x4ecca3,
+                    emissiveIntensity: 0.3
+                });
+                playerEntity = new THREE.Mesh(geometry, material);
+                playerEntity.castShadow = true;
+                playerEntity.userData.playerId = data.playerId;
+                scene.add(playerEntity);
+                otherPlayers.set(data.playerId, playerEntity);
+                console.log('New player entity created:', data.playerId);
+            }
+            
+            // Update position smoothly
+            if (data.position) {
+                playerEntity.position.set(
+                    data.position.x,
+                    data.position.y - 0.8,
+                    data.position.z
+                );
+            }
+            
+            // Update rotation
+            if (data.rotation) {
+                playerEntity.rotation.x = data.rotation.x;
+                playerEntity.rotation.y = data.rotation.y;
+            }
+        }
+
+        function handlePlayerLeft(payload) {
+            const playerEntity = otherPlayers.get(payload.playerId);
+            if (playerEntity) {
+                scene.remove(playerEntity);
+                otherPlayers.delete(payload.playerId);
+                console.log('Player left:', payload.playerId);
+            }
+            gameState.players = gameState.players.filter(p => p.id !== payload.playerId);
+            updatePlayerList(gameState.players);
+        }
 
         // THREE.JS SETUP
         function initThreeJS() {
@@ -1133,7 +1215,12 @@
             
             // Play night music and heartbeat
             soundManager.playNightMusic();
-            soundManager.playHeartbeat(true); // Accelerated heartbeat
+            soundManager.playHeartbeat();
+            
+            // Bedroom color variation based on player
+            const playerIndex = gameState.players.findIndex(p => p.id === gameState.playerId);
+            const wallColors = [0x2a2020, 0x1a2a1a, 0x2a1a2a];
+            const wallColor = wallColors[Math.max(0, playerIndex) % 3];
             
             // Dark room setup
             const ambient = new THREE.AmbientLight(0x1a1a2a, 0.1);
@@ -1148,8 +1235,8 @@
             floor.receiveShadow = true;
             scene.add(floor);
             
-            // Walls
-            const wallMat = new THREE.MeshStandardMaterial({ color: 0x2a2020, roughness: 0.95 });
+            // Walls with variation
+            const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.95 });
             [[0,1.5,-5,8,3,0.3], [-4,1.5,0,0.3,3,10], [4,1.5,0,0.3,3,10]].forEach(([x,y,z,w,h,d]) => {
                 const wall = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), wallMat);
                 wall.position.set(x,y,z);
@@ -1362,21 +1449,260 @@
         // ============================================
         // SOUND SYSTEM - HTML Audio with Procedural Fallback
         // ============================================
+        // ADVANCED SOUND GENERATOR
+        class SoundGenerator {
+            constructor() {
+                this.context = new (window.AudioContext || window.webkitAudioContext)();
+                this.dayInterval = null;
+                this.nightInterval = null;
+                this.nightDrone = null;
+                this.heartbeatInterval = null;
+            }
+            
+            playFootstep(isRunning = false) {
+                if (!settings.sfxEnabled) return;
+                try {
+                    const now = this.context.currentTime;
+                    const duration = isRunning ? 0.08 : 0.12;
+                    const osc = this.context.createOscillator();
+                    const gain = this.context.createGain();
+                    
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(80, now);
+                    osc.frequency.exponentialRampToValueAtTime(40, now + duration);
+                    
+                    gain.gain.setValueAtTime(0.2 * settings.masterVolume, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.context.destination);
+                    
+                    osc.start(now);
+                    osc.stop(now + duration);
+                } catch (e) { console.log('Footstep error:', e.message); }
+            }
+            
+            playHeartbeat() {
+                try {
+                    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+                    const playBeat = () => {
+                        const now = this.context.currentTime;
+                        // First thump
+                        const osc1 = this.context.createOscillator();
+                        const gain1 = this.context.createGain();
+                        osc1.type = 'sine';
+                        osc1.frequency.setValueAtTime(60, now);
+                        osc1.frequency.exponentialRampToValueAtTime(30, now + 0.1);
+                        gain1.gain.setValueAtTime(0.3 * settings.masterVolume, now);
+                        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+                        osc1.connect(gain1);
+                        gain1.connect(this.context.destination);
+                        osc1.start(now);
+                        osc1.stop(now + 0.15);
+                        
+                        // Second thump
+                        const osc2 = this.context.createOscillator();
+                        const gain2 = this.context.createGain();
+                        osc2.type = 'sine';
+                        osc2.frequency.setValueAtTime(60, now + 0.15);
+                        osc2.frequency.exponentialRampToValueAtTime(30, now + 0.25);
+                        gain2.gain.setValueAtTime(0.2 * settings.masterVolume, now + 0.15);
+                        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.27);
+                        osc2.connect(gain2);
+                        gain2.connect(this.context.destination);
+                        osc2.start(now + 0.15);
+                        osc2.stop(now + 0.3);
+                    };
+                    if (gameState.inGame) {
+                        playBeat();
+                        this.heartbeatInterval = setInterval(playBeat, 600); // ~100 BPM
+                    }
+                } catch (e) { console.log('Heartbeat error:', e.message); }
+            }
+            
+            stopHeartbeat() {
+                if (this.heartbeatInterval) {
+                    clearInterval(this.heartbeatInterval);
+                    this.heartbeatInterval = null;
+                }
+            }
+            
+            playDoorCreak() {
+                if (!settings.sfxEnabled) return;
+                try {
+                    const now = this.context.currentTime;
+                    const duration = 2.5;
+                    const osc = this.context.createOscillator();
+                    const gain = this.context.createGain();
+                    const lfo = this.context.createOscillator();
+                    const lfoGain = this.context.createGain();
+                    
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(120, now);
+                    osc.frequency.linearRampToValueAtTime(80, now + duration);
+                    
+                    lfo.type = 'sine';
+                    lfo.frequency.setValueAtTime(3, now);
+                    lfoGain.gain.value = 40;
+                    
+                    gain.gain.setValueAtTime(0, now);
+                    gain.gain.linearRampToValueAtTime(0.15 * settings.masterVolume, now + 0.3);
+                    gain.gain.setValueAtTime(0.15 * settings.masterVolume, now + duration - 0.5);
+                    gain.gain.linearRampToValueAtTime(0, now + duration);
+                    
+                    lfo.connect(lfoGain);
+                    lfoGain.connect(osc.frequency);
+                    osc.connect(gain);
+                    gain.connect(this.context.destination);
+                    
+                    lfo.start(now);
+                    osc.start(now);
+                    lfo.stop(now + duration);
+                    osc.stop(now + duration);
+                } catch (e) { console.log('Door creak error:', e.message); }
+            }
+            
+            playScream() {
+                if (!settings.sfxEnabled) return;
+                try {
+                    const now = this.context.currentTime;
+                    const duration = 1.5;
+                    
+                    // 3 harsh oscillators for terrifying scream
+                    for (let i = 0; i < 3; i++) {
+                        const osc = this.context.createOscillator();
+                        const gain = this.context.createGain();
+                        
+                        osc.type = 'sawtooth';
+                        const baseFreq = 400 + (i * 200);
+                        osc.frequency.setValueAtTime(baseFreq, now);
+                        osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, now + duration);
+                        
+                        gain.gain.setValueAtTime(0.3 * settings.masterVolume, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+                        
+                        osc.connect(gain);
+                        gain.connect(this.context.destination);
+                        
+                        osc.start(now);
+                        osc.stop(now + duration);
+                    }
+                } catch (e) { console.log('Scream error:', e.message); }
+            }
+            
+            playTaskComplete() {
+                if (!settings.sfxEnabled) return;
+                try {
+                    const now = this.context.currentTime;
+                    const notes = [262, 330, 392]; // C, E, G
+                    
+                    notes.forEach((freq, i) => {
+                        const osc = this.context.createOscillator();
+                        const gain = this.context.createGain();
+                        
+                        osc.type = 'sine';
+                        osc.frequency.value = freq;
+                        
+                        gain.gain.setValueAtTime(0, now + i * 0.1);
+                        gain.gain.linearRampToValueAtTime(0.2 * settings.masterVolume, now + i * 0.1 + 0.05);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.6);
+                        
+                        osc.connect(gain);
+                        gain.connect(this.context.destination);
+                        
+                        osc.start(now + i * 0.1);
+                        osc.stop(now + i * 0.1 + 0.6);
+                    });
+                } catch (e) { console.log('Task complete error:', e.message); }
+            }
+            
+            startDayAmbience() {
+                this.stopAmbience();
+                this.dayInterval = setInterval(() => {
+                    if (gameState.phase !== 'day' && gameState.phase !== 'tasks') {
+                        this.stopAmbience();
+                        return;
+                    }
+                    try {
+                        const notes = [261, 293, 329, 392, 440]; // C, D, E, G, A
+                        const note = notes[Math.floor(Math.random() * notes.length)];
+                        const now = this.context.currentTime;
+                        const osc = this.context.createOscillator();
+                        const gain = this.context.createGain();
+                        
+                        osc.type = 'sine';
+                        osc.frequency.value = note;
+                        
+                        gain.gain.setValueAtTime(0, now);
+                        gain.gain.linearRampToValueAtTime(0.05 * settings.masterVolume, now + 0.5);
+                        gain.gain.setValueAtTime(0.05 * settings.masterVolume, now + 2);
+                        gain.gain.linearRampToValueAtTime(0, now + 3);
+                        
+                        osc.connect(gain);
+                        gain.connect(this.context.destination);
+                        
+                        osc.start(now);
+                        osc.stop(now + 3);
+                    } catch (e) {}
+                }, 4000 + Math.random() * 3000);
+            }
+            
+            startNightAmbience() {
+                this.stopAmbience();
+                try {
+                    this.nightDrone = this.context.createOscillator();
+                    const droneGain = this.context.createGain();
+                    this.nightDrone.type = 'sine';
+                    this.nightDrone.frequency.value = 55; // Low A
+                    droneGain.gain.value = 0.08 * settings.masterVolume;
+                    this.nightDrone.connect(droneGain);
+                    droneGain.connect(this.context.destination);
+                    this.nightDrone.start();
+                } catch (e) {}
+                
+                this.nightInterval = setInterval(() => {
+                    if (gameState.phase !== 'night' && !gameState.inBedroom) {
+                        this.stopAmbience();
+                        return;
+                    }
+                    try {
+                        const now = this.context.currentTime;
+                        const osc = this.context.createOscillator();
+                        const gain = this.context.createGain();
+                        
+                        osc.type = 'triangle';
+                        osc.frequency.value = 80 + Math.random() * 200;
+                        
+                        gain.gain.setValueAtTime(0, now);
+                        gain.gain.linearRampToValueAtTime(0.08 * settings.masterVolume, now + 1);
+                        gain.gain.linearRampToValueAtTime(0, now + 4);
+                        
+                        osc.connect(gain);
+                        gain.connect(this.context.destination);
+                        
+                        osc.start(now);
+                        osc.stop(now + 4);
+                    } catch (e) {}
+                }, 5000 + Math.random() * 5000);
+            }
+            
+            stopAmbience() {
+                if (this.dayInterval) clearInterval(this.dayInterval);
+                if (this.nightInterval) clearInterval(this.nightInterval);
+                if (this.nightDrone) {
+                    try { this.nightDrone.stop(); } catch (e) {}
+                    this.nightDrone = null;
+                }
+            }
+        }
+        
+        const soundGen = new SoundGenerator();
+        
         const soundManager = {
-            sounds: {},
-            isInitialized: false,
+            heartbeatInterval: null,
             
             init() {
-                if (this.isInitialized) return;
-                this.isInitialized = true;
-                this.sounds.dayMusic = document.getElementById('dayMusic');
-                this.sounds.nightMusic = document.getElementById('nightMusic');
-                this.sounds.footstep = document.getElementById('footstepSound');
-                this.sounds.doorCreak = document.getElementById('doorCreak');
-                this.sounds.heartbeat = document.getElementById('heartbeatSound');
-                this.sounds.scream = document.getElementById('jumpscareScream');
-                this.sounds.taskComplete = document.getElementById('taskCompleteSound');
-                this.sounds.ambient = document.getElementById('ambientNight');
+                // Initialize Web Audio API
                 console.log('Sound System Initialized');
             },
             
@@ -1389,247 +1715,42 @@
             },
             
             playDayMusic() {
-                this.stopAllMusic();
-                this.init();
-                console.log('Playing day music...');
-                // Use procedural audio for day music
-                try {
-                    this.playProceduralDayMusic();
-                } catch (e) {
-                    console.log('Day music error:', e);
-                }
-            },
-            
-            playProceduralDayMusic() {
-                try {
-                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const now = audioContext.currentTime;
-                    
-                    // Calm Moroccan ambient - A2, E3, E2
-                    const osc1 = audioContext.createOscillator();
-                    const osc2 = audioContext.createOscillator();
-                    const gain = audioContext.createGain();
-                    
-                    osc1.frequency.value = 110; // A2
-                    osc2.frequency.value = 165; // E3
-                    osc1.type = 'sine';
-                    osc2.type = 'sine';
-                    
-                    gain.gain.setValueAtTime(0.2, now);
-                    gain.gain.linearRampToValueAtTime(0.15, now + 1);
-                    
-                    osc1.connect(gain);
-                    osc2.connect(gain);
-                    gain.connect(audioContext.destination);
-                    
-                    osc1.start(now);
-                    osc2.start(now);
-                    
-                    setTimeout(() => {
-                        osc1.stop();
-                        osc2.stop();
-                    }, 2000);
-                    
-                    console.log('Procedural day music started');
-                } catch (e) {
-                    console.error('Procedural audio error:', e);
-                }
+                soundGen.stopAmbience();
+                soundGen.startDayAmbience();
             },
             
             playNightMusic() {
-                this.stopAllMusic();
-                this.init();
-                console.log('Playing night music...');
-                // Use procedural audio for night music
-                try {
-                    this.playProceduralNightMusic();
-                } catch (e) {
-                    console.log('Night music error:', e);
-                }
+                soundGen.stopAmbience();
+                soundGen.startNightAmbience();
             },
             
-            playProceduralNightMusic() {
-                try {
-                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const now = audioContext.currentTime;
-                    
-                    // Tense scary music - A1, F#2 (minor)
-                    const osc1 = audioContext.createOscillator();
-                    const osc2 = audioContext.createOscillator();
-                    const gain = audioContext.createGain();
-                    
-                    osc1.frequency.value = 55; // A1
-                    osc2.frequency.value = 92.5; // F#2
-                    osc1.type = 'square';
-                    osc2.type = 'sine';
-                    
-                    gain.gain.setValueAtTime(0.15, now);
-                    gain.gain.linearRampToValueAtTime(0.1, now + 1);
-                    
-                    osc1.connect(gain);
-                    osc2.connect(gain);
-                    gain.connect(audioContext.destination);
-                    
-                    osc1.start(now);
-                    osc2.start(now);
-                    
-                    setTimeout(() => {
-                        osc1.stop();
-                        osc2.stop();
-                    }, 2000);
-                    
-                    console.log('Procedural night music started');
-                } catch (e) {
-                    console.error('Procedural audio error:', e);
-                }
+            playFootstep(isRunning = false) {
+                soundGen.playFootstep(isRunning);
             },
             
-            playFootstep(isSprinting = false) {
-                if (!settings.sfxEnabled) return;
-                try {
-                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const now = audioContext.currentTime;
-                    const osc = audioContext.createOscillator();
-                    const gain = audioContext.createGain();
-                    
-                    osc.frequency.value = 100 + Math.random() * 50;
-                    osc.type = 'sine';
-                    gain.gain.setValueAtTime(0.15, now);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-                    
-                    osc.connect(gain);
-                    gain.connect(audioContext.destination);
-                    
-                    osc.start(now);
-                    osc.stop(now + 0.1);
-                } catch (e) {
-                    console.log('Footstep error:', e.message);
-                }
-            },
-            
-            playHeartbeat(accelerated = false) {
-                this.init();
-                console.log('Heartbeat - Accelerated:', accelerated);
-                const bpm = accelerated ? 120 : 80;
-                const interval = 60000 / bpm;
-                const playBeat = () => {
-                    try {
-                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                        const now = audioContext.currentTime;
-                        const osc = audioContext.createOscillator();
-                        const gain = audioContext.createGain();
-                        
-                        osc.frequency.value = 80;
-                        osc.type = 'sine';
-                        gain.gain.setValueAtTime(0.2, now);
-                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-                        
-                        osc.connect(gain);
-                        gain.connect(audioContext.destination);
-                        
-                        osc.start(now);
-                        osc.stop(now + 0.15);
-                        
-                        if (gameState.inGame) {
-                            setTimeout(playBeat, interval);
-                        }
-                    } catch (e) {}
-                };
-                if (gameState.inGame) playBeat();
+            playHeartbeat() {
+                soundGen.playHeartbeat();
             },
             
             stopHeartbeat() {
-                gameState.inGame = false; // Stop heartbeat playback
-            },
-            
-            playJumpscare() {
-                if (!settings.sfxEnabled) return;
-                console.log('Jumpscare!');
-                try {
-                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const now = audioContext.currentTime;
-                    const osc = audioContext.createOscillator();
-                    const gain = audioContext.createGain();
-                    
-                    osc.frequency.setValueAtTime(400, now);
-                    osc.frequency.exponentialRampToValueAtTime(150, now + 0.8);
-                    osc.type = 'square';
-                    gain.gain.setValueAtTime(0.3, now);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
-                    
-                    osc.connect(gain);
-                    gain.connect(audioContext.destination);
-                    
-                    osc.start(now);
-                    osc.stop(now + 0.8);
-                } catch (e) {
-                    console.log('Jumpscare error:', e.message);
-                }
-            },
-            
-            playTaskComplete() {
-                if (!settings.sfxEnabled) return;
-                try {
-                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const now = audioContext.currentTime;
-                    
-                    // Major chord: C, E, G
-                    const freqs = [262, 330, 392];
-                    freqs.forEach((freq, i) => {
-                        const osc = audioContext.createOscillator();
-                        const gain = audioContext.createGain();
-                        
-                        osc.frequency.value = freq;
-                        osc.type = 'sine';
-                        gain.gain.setValueAtTime(0.15, now);
-                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-                        
-                        osc.connect(gain);
-                        gain.connect(audioContext.destination);
-                        
-                        osc.start(now);
-                        osc.stop(now + 0.3);
-                    });
-                } catch (e) {
-                    console.log('Task complete error:', e.message);
-                }
+                soundGen.stopHeartbeat();
             },
             
             playDoorCreak() {
-                if (!settings.sfxEnabled) return;
-                try {
-                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const now = audioContext.currentTime;
-                    const osc = audioContext.createOscillator();
-                    const lfo = audioContext.createOscillator();
-                    const lfoGain = audioContext.createGain();
-                    const gain = audioContext.createGain();
-                    
-                    osc.frequency.value = 300;
-                    osc.type = 'sine';
-                    lfo.frequency.value = 2;
-                    lfoGain.gain.value = 150;
-                    
-                    gain.gain.setValueAtTime(0.2, now);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
-                    
-                    lfo.connect(lfoGain);
-                    lfoGain.connect(osc.frequency);
-                    osc.connect(gain);
-                    gain.connect(audioContext.destination);
-                    
-                    osc.start(now);
-                    lfo.start(now);
-                    osc.stop(now + 1.5);
-                    lfo.stop(now + 1.5);
-                } catch (e) {
-                    console.log('Door creak error:', e.message);
-                }
+                soundGen.playDoorCreak();
+            },
+            
+            playJumpscare() {
+                soundGen.playScream();
+            },
+            
+            playTaskComplete() {
+                soundGen.playTaskComplete();
             },
             
             stopAllMusic() {
-                // Web Audio API oscillators handle their own cleanup
-                console.log('All music stopped');
+                soundGen.stopAmbience();
+                this.stopHeartbeat();
             }
         };
 
@@ -1644,41 +1765,6 @@
         window.leaveGame = leaveGame;
     </script>
 
-    <!-- AUDIO ELEMENTS FOR SOUND SYSTEM -->
-    <audio id="dayMusic" loop></audio>
-    <audio id="nightMusic" loop></audio>
-    <audio id="footstepSound"></audio>
-    <audio id="doorCreak"></audio>
-    <audio id="heartbeatSound" loop></audio>
-    <audio id="jumpscareScream"></audio>
-    <audio id="taskCompleteSound"></audio>
-    <audio id="ambientNight" loop></audio>
-
-    <script>
-        // Procedural audio generator for sound effects
-        function generateProceduralAudio(frequency, duration, type = 'sine', volume = 0.3) {
-            try {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.value = frequency;
-                oscillator.type = type;
-                
-                gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + duration);
-                
-                console.log('Procedural audio generated:', frequency + 'Hz, ' + duration + 's');
-            } catch (e) {
-                console.log('Audio context error (this is OK):', e.message);
-            }
-        }
-    </script>
+    <!-- All audio now generated via Web Audio API -->
 </body>
 </html>
