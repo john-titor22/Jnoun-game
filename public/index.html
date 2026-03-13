@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة الجن والإنس - Jnoun vs Humans</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            cursor: crosshair;
+        }
+
+        #gameCanvas.active { display: block; }
+
+        .lobby {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .lobby-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            max-width: 600px;
+            width: 90%;
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(255, 100, 100, 0.5);
+            color: #ff6b6b;
+            text-align: center;
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            color: #aaa;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin: 20px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            color: #4ecca3;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1em;
+            border-radius: 10px;
+            border: 2px solid #4ecca3;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .btn-primary {
+            background: #4ecca3;
+            color: #1a1a2e;
+        }
+
+        .btn-primary:hover {
+            background: #3db88a;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(78, 204, 163, 0.4);
+        }
+
+        .btn-primary:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        .player-list {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .player-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+            border-left: 3px solid #4ecca3;
+        }
+
+        #roomCode {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(78, 204, 163, 0.1);
+            border-radius: 10px;
+        }
+
+        #roomCodeDisplay {
+            font-size: 2.5em;
+            font-weight: bold;
+            letter-spacing: 8px;
+            color: #4ecca3;
+            text-shadow: 0 0 10px rgba(78, 204, 163, 0.5);
+        }
+
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+        }
+
+        #hud.active { display: block; }
+
+        .hud-top {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+
+        .hud-phase {
+            font-size: 2em;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+            padding: 15px 30px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+        }
+
+        .hud-message {
+            font-size: 1.5em;
+            text-shadow: 0 0 20px rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px 40px;
+            border-radius: 10px;
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+        }
+
+        .task-list {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #4ecca3;
+            max-width: 300px;
+        }
+
+        .task-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+        }
+
+        .task-item.completed {
+            text-decoration: line-through;
+            opacity: 0.5;
+        }
+
+        .controls-info {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 0.9em;
+        }
+
+        .vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            box-shadow: inset 0 0 200px rgba(0, 0, 0, 0.9);
+            z-index: 50;
+        }
+
+        #jumpscare {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        #jumpscare.active {
+            display: flex;
+            animation: shake 0.1s infinite;
+        }
+
+        .jumpscare-image {
+            font-size: 20em;
+            animation: scaleJump 0.3s ease-out;
+            filter: drop-shadow(0 0 50px red);
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            25% { transform: translate(-20px, 20px) rotate(-3deg); }
+            50% { transform: translate(20px, -20px) rotate(3deg); }
+            75% { transform: translate(-20px, -20px) rotate(-2deg); }
+        }
+
+        @keyframes scaleJump {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .breathing-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, transparent 40%, rgba(0, 0, 0, 0.8) 100%);
+            animation: breathe 4s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 60;
+            display: none;
+        }
+
+        .breathing-overlay.active { display: block; }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 0.8; }
+        }
+
+        .join-section {
+            display: none;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .join-section.active { display: block; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud">
+        <div class="vignette"></div>
+        <div class="hud-top">
+            <div class="hud-phase" id="hudPhase">🌙 الليل</div>
+        </div>
+        <div class="hud-message" id="hudMessage"></div>
+        <div class="task-list" id="taskList" style="display:none;">
+            <h3 style="margin-bottom:10px;">مهامك - Your Tasks</h3>
+            <div id="taskItems"></div>
+        </div>
+        <div class="controls-info" id="controlsInfo">
+            <div>🖱️ Click + Drag - Look Around</div>
+            <div>WASD / Arrows - Move</div>
+            <div>Shift - Sprint</div>
+            <div>E - Interact</div>
+        </div>
+    </div>
+
+    <div class="breathing-overlay" id="breathingOverlay"></div>
+
+    <div id="jumpscare">
+        <div class="jumpscare-image">👹</div>
+    </div>
+
+    <div id="lobbyScreen" class="lobby">
+        <div class="lobby-card">
+            <h1>🌙 لعبة الجن والإنس 🌙</h1>
+            <p class="subtitle">Jnoun vs Humans - Multiplayer</p>
+            
+            <div class="input-group">
+                <label>اسمك - Your Name</label>
+                <input type="text" id="playerName" placeholder="Enter your name">
+            </div>
+            
+            <div id="createSection">
+                <div class="input-group">
+                    <label>عدد الجن - Number of Jnoun</label>
+                    <select id="jnounCount">
+                        <option value="1">1 Jnoun</option>
+                        <option value="2">2 Jnouns</option>
+                        <option value="3">3 Jnouns</option>
+                    </select>
+                </div>
+                
+                <button class="btn btn-primary" onclick="createRoom()">إنشاء غرفة - Create Room</button>
+                
+                <p style="text-align:center; margin:20px 0; color:#aaa;">- OR -</p>
+                
+                <button class="btn btn-primary" onclick="toggleJoinSection()">انضم إلى غرفة - Join Room</button>
+            </div>
+            
+            <div id="joinSection" class="join-section">
+                <div class="input-group">
+                    <label>كود الغرفة - Room Code</label>
+                    <input type="text" id="joinRoomCode" placeholder="Enter 6-character code" maxlength="6" style="text-transform:uppercase;">
+                </div>
+                <button class="btn btn-primary" onclick="joinRoom()">انضم - Join</button>
+            </div>
+            
+            <div id="roomCode" style="display:none;">
+                <p style="font-size:1.2em; color:#4ecca3; margin-bottom:10px;">Room Code:</p>
+                <p id="roomCodeDisplay"></p>
+                <p style="font-size:0.9em; color:#aaa; margin-top:10px;">Share this code with friends</p>
+            </div>
+            
+            <div class="player-list" id="lobbyPlayers" style="display:none;">
+                <div style="font-weight:bold; margin-bottom:10px;">Players in Room:</div>
+                <div id="playerListItems"></div>
+            </div>
+            
+            <button class="btn btn-primary" onclick="startGame()" id="startBtn" style="display:none;">
+                ابدأ اللعبة - Start Game
+            </button>
+            
+            <div id="statusMessage" style="text-align:center; margin-top:20px; color:#ff6b6b; display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // WebSocket connection
+        const WS_URL = window.location.origin.replace(/^http/, 'ws');
+        let ws = null;
+        
+        // Game state
+        const gameState = {
+            playerId: Date.now() + '-' + Math.random(),
+            playerName: '',
+            roomCode: null,
+            players: [],
+            isHost: false,
+            role: null,
+            phase: 'lobby',
+            tasks: [],
+            completedTasks: [],
+            canMove: true,
+            willBePossessed: false
+        };
+
+        // Three.js
+        let scene, camera, renderer, clock = new THREE.Clock();
+        let keys = {}, mouse = { isDown: false, lastX: 0, lastY: 0 };
+        let jnounEntity = null;
+        let taskMarkers = [];
+
+        // Connect to WebSocket
+        function connectWebSocket() {
+            ws = new WebSocket(WS_URL);
+            
+            ws.onopen = () => {
+                console.log('Connected to server');
+            };
+            
+            ws.onmessage = (event) => {
+                const { type, payload } = JSON.parse(event.data);
+                handleServerMessage(type, payload);
+            };
+            
+            ws.onclose = () => {
+                console.log('Disconnected from server');
+                showStatus('Connection lost. Refresh to reconnect.');
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                showStatus('Connection error');
+            };
+        }
+
+        function handleServerMessage(type, payload) {
+            switch(type) {
+                case 'ROOM_CREATED':
+                    handleRoomCreated(payload);
+                    break;
+                case 'ROOM_JOINED':
+                    handleRoomJoined(payload);
+                    break;
+                case 'PLAYER_LIST':
+                    updatePlayerList(payload.players);
+                    break;
+                case 'GAME_START':
+                    handleGameStart(payload);
+                    break;
+                case 'ROLE_ASSIGNED':
+                    handleRoleAssigned(payload);
+                    break;
+                case 'PHASE_CHANGE':
+                    handlePhaseChange(payload);
+                    break;
+                case 'ENTER_BEDROOM':
+                    handleEnterBedroom(payload);
+                    break;
+                case 'POSSESSED':
+                    handlePossession(payload);
+                    break;
+                case 'GAME_END':
+                    handleGameEnd(payload);
+                    break;
+                case 'ERROR':
+                    showStatus(payload.message);
+                    break;
+            }
+        }
+
+        function sendToServer(type, payload) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type, payload }));
+            }
+        }
+
+        function createRoom() {
+            const name = document.getElementById('playerName').value.trim();
+            if (!name) {
+                showStatus('Please enter your name');
+                return;
+            }
+            
+            const jnounCount = parseInt(document.getElementById('jnounCount').value);
+            gameState.playerName = name;
+            gameState.isHost = true;
+            
+            sendToServer('CREATE_ROOM', {
+                playerId: gameState.playerId,
+                playerName: name,
+                jnounCount: jnounCount
+            });
+        }
+
+        function joinRoom() {
+            const name = document.getElementById('playerName').value.trim();
+            const roomCode = document.getElementById('joinRoomCode').value.trim().toUpperCase();
+            
+            if (!name) {
+                showStatus('Please enter your name');
+                return;
+            }
+            
+            if (roomCode.length !== 6) {
+                showStatus('Room code must be 6 characters');
+                return;
+            }
+            
+            gameState.playerName = name;
+            
+            sendToServer('JOIN_ROOM', {
+                playerId: gameState.playerId,
+                playerName: name,
+                roomCode: roomCode
+            });
+        }
+
+        function startGame() {
+            if (!gameState.isHost) return;
+            
+            sendToServer('START_GAME', {
+                roomCode: gameState.roomCode
+            });
+        }
+
+        function handleRoomCreated(payload) {
+            gameState.roomCode = payload.roomCode;
+            document.getElementById('roomCode').style.display = 'block';
+            document.getElementById('roomCodeDisplay').textContent = payload.roomCode;
+            document.getElementById('lobbyPlayers').style.display = 'block';
+            document.getElementById('startBtn').style.display = 'block';
+            document.getElementById('createSection').style.display = 'none';
+        }
+
+        function handleRoomJoined(payload) {
+            gameState.roomCode = payload.roomCode;
+            document.getElementById('roomCode').style.display = 'block';
+            document.getElementById('roomCodeDisplay').textContent = payload.roomCode;
+            document.getElementById('lobbyPlayers').style.display = 'block';
+            document.getElementById('createSection').style.display = 'none';
+            document.getElementById('joinSection').style.display = 'none';
+        }
+
+        function updatePlayerList(players) {
+            gameState.players = players;
+            const container = document.getElementById('playerListItems');
+            container.innerHTML = players.map(p => 
+                `<div class="player-item">${p.name} ${p.isHost ? '👑' : ''}</div>`
+            ).join('');
+        }
+
+        function handleGameStart(payload) {
+            document.getElementById('lobbyScreen').style.display = 'none';
+            initThreeJS();
+            gameState.phase = 'day';
+            createDayScene();
+            updateHUD('☀️ اليوم الأول', 'الجميع بشر - أكمل مهامك');
+        }
+
+        function handleRoleAssigned(payload) {
+            gameState.role = payload.role;
+            gameState.tasks = payload.tasks || [];
+            displayTasks();
+        }
+
+        function handlePhaseChange(payload) {
+            gameState.phase = payload.phase;
+            updateHUD(payload.phase === 'night' ? '🌙 الليل' : '☀️ النهار', payload.message);
+        }
+
+        function handleEnterBedroom(payload) {
+            gameState.willBePossessed = payload.willBePossessed;
+            createBedroomScene();
+        }
+
+        function handlePossession(payload) {
+            showPossessionScreen(payload.message);
+        }
+
+        function handleGameEnd(payload) {
+            updateHUD('🎮 انتهت اللعبة', payload.message);
+            setTimeout(() => location.reload(), 5000);
+        }
+
+        function toggleJoinSection() {
+            const section = document.getElementById('joinSection');
+            section.classList.toggle('active');
+        }
+
+        function showStatus(message) {
+            const status = document.getElementById('statusMessage');
+            status.textContent = message;
+            status.style.display = 'block';
+            setTimeout(() => status.style.display = 'none', 3000);
+        }
+
+        function displayTasks() {
+            if (gameState.tasks.length === 0) return;
+            
+            const taskList = document.getElementById('taskList');
+            const taskItems = document.getElementById('taskItems');
+            
+            taskList.style.display = 'block';
+            taskItems.innerHTML = gameState.tasks.map(task => 
+                `<div class="task-item" id="task-${task.id}">${task.name}</div>`
+            ).join('');
+        }
+
+        function completeTask(taskId) {
+            if (gameState.completedTasks.includes(taskId)) return;
+            
+            gameState.completedTasks.push(taskId);
+            const taskEl = document.getElementById(`task-${taskId}`);
+            if (taskEl) {
+                taskEl.classList.add('completed');
+            }
+            
+            // Remove task marker
+            const markerIndex = taskMarkers.findIndex(m => m.userData.taskId === taskId);
+            if (markerIndex >= 0) {
+                scene.remove(taskMarkers[markerIndex]);
+                taskMarkers.splice(markerIndex, 1);
+            }
+        }
+
+        // THREE.JS SETUP
+        function initThreeJS() {
+            const canvas = document.getElementById('gameCanvas');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.setClearColor(0x000000);
+            
+            canvas.classList.add('active');
+            document.getElementById('hud').classList.add('active');
+            
+            // Mouse controls
+            canvas.addEventListener('mousedown', (e) => {
+                mouse.isDown = true;
+                mouse.lastX = e.clientX;
+                mouse.lastY = e.clientY;
+            });
+            
+            document.addEventListener('mouseup', () => mouse.isDown = false);
+            
+            document.addEventListener('mousemove', (e) => {
+                if (mouse.isDown) {
+                    const deltaX = e.clientX - mouse.lastX;
+                    const deltaY = e.clientY - mouse.lastY;
+                    
+                    camera.rotation.y -= deltaX * 0.003;
+                    camera.rotation.x -= deltaY * 0.003;
+                    camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+                    
+                    mouse.lastX = e.clientX;
+                    mouse.lastY = e.clientY;
+                }
+            });
+            
+            document.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+            document.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+            
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+            
+            animate();
+        }
+
+        // DAY SCENE
+        function createDayScene() {
+            clearScene();
+            gameState.canMove = true;
+            scene.fog = new THREE.Fog(0x0a0505, 5, 30);
+            
+            // Floor
+            const floor = new THREE.Mesh(
+                new THREE.PlaneGeometry(30, 30),
+                new THREE.MeshStandardMaterial({ color: 0x8B6914, roughness: 0.85 })
+            );
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+            
+            // Walls
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0xc47a4a, roughness: 0.9 });
+            [[0,2,-15,30,4,0.5], [0,2,15,30,4,0.5], [-15,2,0,0.5,4,30], [15,2,0,0.5,4,30]].forEach(([x,y,z,w,h,d]) => {
+                const wall = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), wallMat);
+                wall.position.set(x,y,z);
+                wall.castShadow = true;
+                scene.add(wall);
+            });
+            
+            // Ceiling
+            const ceiling = new THREE.Mesh(
+                new THREE.PlaneGeometry(30, 30),
+                new THREE.MeshStandardMaterial({ color: 0x5a3a2a, roughness: 0.95 })
+            );
+            ceiling.rotation.x = Math.PI / 2;
+            ceiling.position.y = 4;
+            scene.add(ceiling);
+            
+            // Furniture
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                const cushion = new THREE.Mesh(
+                    new THREE.BoxGeometry(2, 0.5, 1),
+                    new THREE.MeshStandardMaterial({ color: 0x8B0000, roughness: 0.9 })
+                );
+                cushion.position.set(Math.cos(angle) * 12, 0.25, Math.sin(angle) * 12);
+                cushion.castShadow = true;
+                scene.add(cushion);
+            }
+            
+            // Lighting
+            const ambient = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambient);
+            
+            const mainLight = new THREE.PointLight(0xffaa33, 0.8, 25);
+            mainLight.position.set(0, 3.5, 0);
+            mainLight.castShadow = true;
+            scene.add(mainLight);
+            
+            camera.position.set(0, 1.6, 12);
+            camera.rotation.set(0, Math.PI, 0);
+            
+            // Create task markers
+            createTaskMarkers();
+        }
+
+        function createTaskMarkers() {
+            const positions = {
+                lantern: [0, 3, 0],
+                cushion: [-10, 0.5, -10],
+                table: [0, 0.5, 0],
+                door: [14, 1.5, 0],
+                vase: [10, 0.8, 10]
+            };
+            
+            gameState.tasks.forEach(task => {
+                const pos = positions[task.location];
+                if (!pos) return;
+                
+                const marker = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.3, 16, 16),
+                    new THREE.MeshStandardMaterial({
+                        color: 0x00ff00,
+                        emissive: 0x00ff00,
+                        emissiveIntensity: 0.8,
+                        transparent: true,
+                        opacity: 0.6
+                    })
+                );
+                marker.position.set(...pos);
+                marker.userData.taskId = task.id;
+                marker.userData.taskName = task.name;
+                marker.userData.startY = pos[1];
+                marker.userData.time = Math.random() * Math.PI * 2;
+                scene.add(marker);
+                taskMarkers.push(marker);
+            });
+        }
+
+        // BEDROOM SCENE
+        function createBedroomScene() {
+            clearScene();
+            gameState.canMove = false;
+            scene.fog = new THREE.Fog(0x0a0a0a, 1, 15);
+            document.getElementById('breathingOverlay').classList.add('active');
+            
+            // Dark room setup
+            const ambient = new THREE.AmbientLight(0x1a1a2a, 0.1);
+            scene.add(ambient);
+            
+            // Floor
+            const floor = new THREE.Mesh(
+                new THREE.PlaneGeometry(8, 10),
+                new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1 })
+            );
+            floor.rotation.x = -Math.PI / 2;
+            scene.add(floor);
+            
+            // Walls
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x2a2020, roughness: 0.95 });
+            [[0,1.5,-5,8,3,0.3], [-4,1.5,0,0.3,3,10], [4,1.5,0,0.3,3,10]].forEach(([x,y,z,w,h,d]) => {
+                scene.add(new THREE.Mesh(new THREE.BoxGeometry(w,h,d), wallMat).position.set(x,y,z));
+            });
+            
+            // Bed
+            const bed = new THREE.Mesh(
+                new THREE.BoxGeometry(2.5, 0.6, 3.5),
+                new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.9 })
+            );
+            bed.position.set(0, 0.3, -2);
+            scene.add(bed);
+            
+            // Door with light
+            const door = new THREE.Mesh(
+                new THREE.BoxGeometry(1, 2.3, 0.08),
+                new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.9 })
+            );
+            door.position.set(3, 1.15, 4.85);
+            door.rotation.y = 0.15;
+            scene.add(door);
+            
+            // Corridor light
+            const light = new THREE.SpotLight(0xffaa00, 0.8, 20, Math.PI/8, 0.8);
+            light.position.set(2.5, 2, 6);
+            light.castShadow = true;
+            scene.add(light);
+            
+            setInterval(() => light.intensity = 0.5 + Math.random() * 0.5, 150);
+            
+            camera.position.set(0, 1.2, -1.5);
+            camera.rotation.set(0, 0, 0);
+            
+            updateHUD('🛏️ في سريرك', 'لا يمكنك التحرك...');
+            
+            // If player will be possessed, show jnoun
+            if (gameState.willBePossessed) {
+                setTimeout(() => openDoorSlowly(door), 4000);
+            }
+        }
+
+        function openDoorSlowly(door) {
+            let rotation = 0.15;
+            const interval = setInterval(() => {
+                rotation += 0.01;
+                door.rotation.y = rotation;
+                if (rotation >= 0.6) {
+                    clearInterval(interval);
+                    setTimeout(() => jnounAppearsInDoorway(), 2000);
+                }
+            }, 80);
+        }
+
+        function jnounAppearsInDoorway() {
+            const jnounGeom = new THREE.ConeGeometry(0.8, 2.5, 8);
+            const jnounMat = new THREE.MeshStandardMaterial({
+                color: 0x000000,
+                emissive: 0x8b0000,
+                emissiveIntensity: 0.3
+            });
+            jnounEntity = new THREE.Mesh(jnounGeom, jnounMat);
+            jnounEntity.position.set(2.5, 1.25, 4.5);
+            
+            // Eyes
+            const eyeMat = new THREE.MeshStandardMaterial({
+                color: 0xff0000,
+                emissive: 0xff0000,
+                emissiveIntensity: 2
+            });
+            [-0.25, 0.25].forEach(x => {
+                const eye = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), eyeMat);
+                eye.position.set(x, 0.9, 0.5);
+                jnounEntity.add(eye);
+            });
+            
+            scene.add(jnounEntity);
+            
+            // Approach
+            const interval = setInterval(() => {
+                jnounEntity.position.z -= 0.03;
+                if (jnounEntity.position.z <= -0.5) {
+                    clearInterval(interval);
+                    triggerJumpscare();
+                }
+            }, 50);
+        }
+
+        function triggerJumpscare() {
+            const jumpscare = document.getElementById('jumpscare');
+            jumpscare.classList.add('active');
+            
+            let flashes = 0;
+            const interval = setInterval(() => {
+                jumpscare.style.background = flashes % 2 ? '#8b0000' : '#000';
+                flashes++;
+                if (flashes >= 8) clearInterval(interval);
+            }, 100);
+            
+            setTimeout(() => {
+                jumpscare.classList.remove('active');
+                // Player is now possessed - server handles this
+            }, 2500);
+        }
+
+        function showPossessionScreen(message) {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: radial-gradient(circle, transparent, #000);
+                display: flex; justify-content: center; align-items: center;
+                z-index: 10000; animation: pulseRed 2s ease-in-out;
+            `;
+            overlay.innerHTML = `
+                <div style="text-align: center; color: #ff0000; font-size: 3em; text-shadow: 0 0 30px #ff0000;">
+                    <div style="font-size: 5em; margin-bottom: 20px;">👹</div>
+                    <div>${message}</div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            
+            setTimeout(() => overlay.remove(), 4000);
+        }
+
+        // ANIMATION LOOP
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            
+            if (gameState.canMove) {
+                updatePlayerMovement(delta);
+            }
+            
+            // Animate task markers
+            taskMarkers.forEach(marker => {
+                marker.userData.time += delta * 2;
+                marker.position.y = marker.userData.startY + Math.sin(marker.userData.time) * 0.2;
+                
+                // Check proximity
+                const dist = camera.position.distanceTo(marker.position);
+                if (dist < 2 && keys['e']) {
+                    completeTask(marker.userData.taskId);
+                }
+            });
+            
+            renderer.render(scene, camera);
+        }
+
+        function updatePlayerMovement(delta) {
+            const speed = keys['shift'] ? 10 : 5;
+            const velocity = new THREE.Vector3();
+            
+            if (keys['w'] || keys['arrowup']) velocity.z = -1;
+            if (keys['s'] || keys['arrowdown']) velocity.z = 1;
+            if (keys['a'] || keys['arrowleft']) velocity.x = -1;
+            if (keys['d'] || keys['arrowright']) velocity.x = 1;
+            
+            velocity.normalize();
+            velocity.applyAxisAngle(new THREE.Vector3(0,1,0), camera.rotation.y);
+            velocity.multiplyScalar(speed * delta);
+            
+            camera.position.add(velocity);
+            camera.position.x = Math.max(-14, Math.min(14, camera.position.x));
+            camera.position.z = Math.max(-14, Math.min(14, camera.position.z));
+            camera.position.y = 1.6;
+        }
+
+        function clearScene() {
+            while(scene.children.length > 0) scene.remove(scene.children[0]);
+            taskMarkers = [];
+            jnounEntity = null;
+        }
+
+        function updateHUD(phase, message) {
+            document.getElementById('hudPhase').textContent = phase;
+            document.getElementById('hudMessage').textContent = message;
+        }
+
+        // Connect on load
+        window.addEventListener('load', connectWebSocket);
+        
+        // Expose functions
+        window.createRoom = createRoom;
+        window.joinRoom = joinRoom;
+        window.startGame = startGame;
+        window.toggleJoinSection = toggleJoinSection;
+    </script>
+</body>
+</html>
