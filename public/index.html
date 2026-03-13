@@ -832,13 +832,27 @@
         }
 
         function completeTask(taskId) {
-            if (gameState.completedTasks.includes(taskId)) return;
+            console.log('Attempting to complete task:', taskId);
+            console.log('Already completed:', gameState.completedTasks);
             
-            soundManager.playTaskComplete();
+            if (gameState.completedTasks.includes(taskId)) {
+                console.log('Task already completed!');
+                return;
+            }
+            
             gameState.completedTasks.push(taskId);
+            console.log('Task completed! New completed list:', gameState.completedTasks);
+            
+            // Update UI
             const taskEl = document.getElementById(`task-${taskId}`);
             if (taskEl) {
                 taskEl.classList.add('completed');
+                console.log('Updated task UI');
+            }
+            
+            // Play sound
+            if (soundManager && soundManager.playTaskComplete) {
+                soundManager.playTaskComplete();
             }
             
             // Remove task marker
@@ -846,6 +860,14 @@
             if (markerIndex >= 0) {
                 scene.remove(taskMarkers[markerIndex]);
                 taskMarkers.splice(markerIndex, 1);
+                console.log('Removed task marker from scene');
+            }
+            
+            // Check if all tasks completed
+            const totalTasks = gameState.tasks.length;
+            if (gameState.completedTasks.length >= totalTasks) {
+                updateHUD('✅ مهام مكتملة', 'لقد أكملت جميع المهام!');
+                console.log('ALL TASKS COMPLETED!');
             }
         }
 
@@ -924,6 +946,11 @@
         function broadcastPlayerPosition() {
             if (!gameState.inGame || !gameState.canMove) return;
             
+            // Check if player is moving
+            const isMoving = keys['w'] || keys['s'] || keys['a'] || keys['d'] || 
+                             keys['z'] || keys['q'] || // AZERTY
+                             keys['arrowup'] || keys['arrowdown'] || keys['arrowleft'] || keys['arrowright'];
+            
             sendToServer('PLAYER_STATE', {
                 roomCode: gameState.roomCode,
                 position: {
@@ -934,8 +961,91 @@
                 rotation: {
                     x: camera.rotation.x,
                     y: camera.rotation.y
-                }
+                },
+                isMoving: isMoving
             });
+        }
+
+        // CREATE HUMANOID CHARACTER MODEL
+        function createPlayerCharacter(color = 0x4ecca3) {
+            const character = new THREE.Group();
+            
+            // Body
+            const bodyGeom = new THREE.CapsuleGeometry(0.25, 0.8, 4, 8);
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: color,
+                roughness: 0.8
+            });
+            const body = new THREE.Mesh(bodyGeom, bodyMat);
+            body.position.y = 0.8;
+            body.castShadow = true;
+            character.add(body);
+            
+            // Head
+            const headGeom = new THREE.SphereGeometry(0.2, 16, 16);
+            const headMat = new THREE.MeshStandardMaterial({
+                color: 0xffdbac, // Skin tone
+                roughness: 0.9
+            });
+            const head = new THREE.Mesh(headGeom, headMat);
+            head.position.y = 1.5;
+            head.castShadow = true;
+            character.add(head);
+            
+            // Eyes
+            const eyeGeom = new THREE.SphereGeometry(0.03, 8, 8);
+            const eyeMat = new THREE.MeshStandardMaterial({
+                color: 0x000000
+            });
+            
+            const leftEye = new THREE.Mesh(eyeGeom, eyeMat);
+            leftEye.position.set(-0.08, 1.55, 0.18);
+            character.add(leftEye);
+            
+            const rightEye = new THREE.Mesh(eyeGeom, eyeMat);
+            rightEye.position.set(0.08, 1.55, 0.18);
+            character.add(rightEye);
+            
+            // Arms
+            const armGeom = new THREE.CapsuleGeometry(0.08, 0.6, 4, 8);
+            const armMat = new THREE.MeshStandardMaterial({
+                color: color,
+                roughness: 0.8
+            });
+            
+            const leftArm = new THREE.Mesh(armGeom, armMat);
+            leftArm.position.set(-0.35, 0.9, 0);
+            leftArm.rotation.z = 0.2;
+            leftArm.castShadow = true;
+            character.add(leftArm);
+            
+            const rightArm = new THREE.Mesh(armGeom, armMat);
+            rightArm.position.set(0.35, 0.9, 0);
+            rightArm.rotation.z = -0.2;
+            rightArm.castShadow = true;
+            character.add(rightArm);
+            
+            // Legs
+            const legGeom = new THREE.CapsuleGeometry(0.1, 0.7, 4, 8);
+            const legMat = new THREE.MeshStandardMaterial({
+                color: 0x2a2a2a, // Dark pants
+                roughness: 0.9
+            });
+            
+            const leftLeg = new THREE.Mesh(legGeom, legMat);
+            leftLeg.position.set(-0.12, 0.35, 0);
+            leftLeg.castShadow = true;
+            character.add(leftLeg);
+            
+            const rightLeg = new THREE.Mesh(legGeom, legMat);
+            rightLeg.position.set(0.12, 0.35, 0);
+            rightLeg.castShadow = true;
+            character.add(rightLeg);
+            
+            character.castShadow = true;
+            character.receiveShadow = true;
+            
+            return character;
         }
 
         function updateOtherPlayer(data) {
@@ -944,34 +1054,60 @@
             let playerEntity = otherPlayers.get(data.playerId);
             
             if (!playerEntity) {
-                // Create new player cylinder
-                const geometry = new THREE.CylinderGeometry(0.3, 0.3, 1.6, 8);
-                const material = new THREE.MeshStandardMaterial({
-                    color: 0x4ecca3,
-                    emissive: 0x4ecca3,
-                    emissiveIntensity: 0.3
-                });
-                playerEntity = new THREE.Mesh(geometry, material);
-                playerEntity.castShadow = true;
-                playerEntity.userData.playerId = data.playerId;
+                // Create humanoid character
+                const playerColors = [0x4ecca3, 0xff6b6b, 0xffd93d, 0x6b8eff, 0xff9f43];
+                const colorIndex = Array.from(otherPlayers.keys()).length % playerColors.length;
+                playerEntity = createPlayerCharacter(playerColors[colorIndex]);
+                
                 scene.add(playerEntity);
                 otherPlayers.set(data.playerId, playerEntity);
-                console.log('New player entity created:', data.playerId);
+                
+                console.log('Created player character for:', data.playerId);
             }
             
-            // Update position smoothly
+            // Update position smoothly with interpolation
             if (data.position) {
-                playerEntity.position.set(
-                    data.position.x,
-                    data.position.y - 0.8,
-                    data.position.z
+                playerEntity.position.lerp(
+                    new THREE.Vector3(data.position.x, data.position.y, data.position.z),
+                    0.3 // Smoothing factor
                 );
             }
             
             // Update rotation
             if (data.rotation) {
-                playerEntity.rotation.x = data.rotation.x;
                 playerEntity.rotation.y = data.rotation.y;
+            }
+            
+            // Animate during movement
+            if (data.isMoving) {
+                const time = Date.now() * 0.005;
+                
+                // Get leg and arm meshes (children indices)
+                const leftLeg = playerEntity.children[4];
+                const rightLeg = playerEntity.children[5];
+                const leftArm = playerEntity.children[2];
+                const rightArm = playerEntity.children[3];
+                
+                if (leftLeg && rightLeg) {
+                    leftLeg.rotation.x = Math.sin(time) * 0.5;
+                    rightLeg.rotation.x = Math.sin(time + Math.PI) * 0.5;
+                }
+                
+                if (leftArm && rightArm) {
+                    leftArm.rotation.x = Math.sin(time + Math.PI) * 0.3;
+                    rightArm.rotation.x = Math.sin(time) * 0.3;
+                }
+            } else {
+                // Reset to standing pose
+                const leftLeg = playerEntity.children[4];
+                const rightLeg = playerEntity.children[5];
+                const leftArm = playerEntity.children[2];
+                const rightArm = playerEntity.children[3];
+                
+                if (leftLeg) leftLeg.rotation.x = 0;
+                if (rightLeg) rightLeg.rotation.x = 0;
+                if (leftArm) leftArm.rotation.x = 0;
+                if (rightArm) rightArm.rotation.x = 0;
             }
         }
 
@@ -1060,6 +1196,20 @@
             
             document.addEventListener('keydown', (e) => {
                 keys[e.key.toLowerCase()] = true;
+                
+                // Debug: T to show task locations
+                if (e.key.toLowerCase() === 't') {
+                    console.log('=== TASK DEBUG ===');
+                    console.log('Total tasks:', gameState.tasks);
+                    console.log('Task markers in scene:', taskMarkers.length);
+                    console.log('Camera position:', camera.position);
+                    taskMarkers.forEach((marker, i) => {
+                        const dist = camera.position.distanceTo(marker.position);
+                        console.log(`Task ${i}: ${marker.userData.taskName}`);
+                        console.log(`  Position:`, marker.position);
+                        console.log(`  Distance: ${dist.toFixed(2)}`);
+                    });
+                }
                 
                 // ESC to open menu
                 if (e.key === 'Escape') {
@@ -1316,13 +1466,13 @@
                 if (!pos) return;
                 
                 const marker = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.4, 16, 16),
+                    new THREE.SphereGeometry(0.5, 16, 16),
                     new THREE.MeshStandardMaterial({
                         color: 0x00ff00,
                         emissive: 0x00ff00,
-                        emissiveIntensity: 1.2,
+                        emissiveIntensity: 2.0,
                         transparent: true,
-                        opacity: 0.7
+                        opacity: 0.8
                     })
                 );
                 marker.position.set(...pos);
@@ -1331,8 +1481,8 @@
                 marker.userData.startY = pos[1];
                 marker.userData.time = Math.random() * Math.PI * 2;
                 
-                // Add glow light
-                const glowLight = new THREE.PointLight(0x00ff00, 0.8, 5);
+                // Add bright glow light
+                const glowLight = new THREE.PointLight(0x00ff00, 1.5, 8);
                 glowLight.position.set(...pos);
                 scene.add(glowLight);
                 
@@ -1519,16 +1669,37 @@
             
             // Animate task markers
             taskMarkers.forEach(marker => {
+                if (!marker || !marker.userData) return;
+                
                 marker.userData.time += delta * 2;
                 marker.position.y = marker.userData.startY + Math.sin(marker.userData.time) * 0.3;
                 
-                // Check proximity
+                // Check proximity - LARGER RADIUS
                 const dist = camera.position.distanceTo(marker.position);
-                if (dist < 2.5) {
-                    updateHUD('☀️ اليوم الأول', `Press E: ${marker.userData.taskName}`);
+                
+                // Debug: log when player is near
+                if (dist < 4) {
+                    console.log(`Near task: ${marker.userData.taskName}, distance: ${dist.toFixed(2)}`);
+                }
+                
+                if (dist < 3.5) {
+                    // Show interaction prompt
+                    const message = `Press E: ${marker.userData.taskName}`;
+                    updateHUD('☀️ اليوم الأول', message);
+                    
+                    // Make marker pulse faster when near
+                    marker.material.emissiveIntensity = 1.5 + Math.sin(Date.now() * 0.01) * 0.5;
+                    marker.scale.setScalar(1.2 + Math.sin(Date.now() * 0.01) * 0.2);
+                    
+                    // Debug E key press
                     if (keys['e']) {
+                        console.log('E pressed! Completing task:', marker.userData.taskId);
                         completeTask(marker.userData.taskId);
                     }
+                } else {
+                    // Normal state
+                    marker.material.emissiveIntensity = 2.0;
+                    marker.scale.setScalar(1.0);
                 }
             });
             
