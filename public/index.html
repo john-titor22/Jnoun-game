@@ -1347,7 +1347,7 @@
             
             // Create ground floor rooms
             RIAD_CONFIG.rooms.groundFloor.forEach(room => {
-                createRoom(room, 0);
+                createRiadRoom(room, 0);
             });
         }
 
@@ -1369,7 +1369,7 @@
             
             // Create upper floor rooms
             RIAD_CONFIG.rooms.upperFloor.forEach(room => {
-                createRoom(room, floorY);
+                createRiadRoom(room, floorY);
             });
             
             // Balcony railing around courtyard
@@ -1444,7 +1444,7 @@
             scene.add(fountain);
         }
 
-        function createRoom(roomConfig, floorY) {
+        function createRiadRoom(roomConfig, floorY) {
             const { x, z, width, depth, door, name } = roomConfig;
             const wallHeight = RIAD_CONFIG.building.floorHeight - 0.3;
             const wallThickness = RIAD_CONFIG.building.wallThickness;
