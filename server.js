@@ -270,30 +270,41 @@ function transformRandomPlayerToJnoun(roomCode) {
     jnoun.role = 'jnoun';
     room.jnoun = jnoun;
     
-    // Reveal to Jnoun ONLY
+    // SEND POSSESSION SEQUENCE TO JNOUN FIRST (before role reveal)
     sendToPlayer(jnoun.ws, {
-        type: 'TRANSFORMATION',
+        type: 'JNOUN_POSSESSION_SEQUENCE',
         payload: {
-            role: 'jnoun',
-            message: 'أنت الآن جني! - You are now Jnoun! Mark players for death by tricking them into following your commands.'
+            message: 'شيء ما يقترب...'
         }
     });
     
-    // Reveal to Imam ONLY (now they know their role)
+    // After possession animation (15 seconds), reveal role
+    setTimeout(() => {
+        sendToPlayer(jnoun.ws, {
+            type: 'TRANSFORMATION',
+            payload: {
+                role: 'jnoun',
+                message: 'أنت الآن جني! - You are now Jnoun! Guide players to darkness to mark them for death.'
+            }
+        });
+    }, 15000);
+    
+    // Reveal to Imam at same time as Jnoun possession starts
     sendToPlayer(room.secretImam.ws, {
         type: 'TRANSFORMATION',
         payload: {
             role: 'imam',
-            message: 'أنت الإمام! - You are the Imam! Protect players by guiding them safely.'
+            message: 'أنت الإمام! - You are the Imam! Guide players to safety to protect them.'
         }
     });
     
     // Update Imam's actual role
     room.secretImam.role = 'imam';
     
+    // Wake everyone for Day 2 after possession completes
     setTimeout(() => {
         wakeUpForDay2(roomCode);
-    }, 10000);
+    }, 20000);
 }
 
 function wakeUpForDay2(roomCode) {
@@ -301,17 +312,21 @@ function wakeUpForDay2(roomCode) {
     room.phase = 'day';
     room.dayNumber = 2;
     
+    // Clear bedroom scene and move to salon
     broadcastToRoom(roomCode, {
-        type: 'PHASE_CHANGE',
+        type: 'WAKE_UP',
         payload: {
             phase: 'day',
-            message: 'اليوم الثاني - Someone among you has changed...'
+            dayNumber: 2,
+            message: 'اليوم الثاني - Someone among you has changed...',
+            location: 'salon'
         }
     });
     
+    // Start command phase after players gather
     setTimeout(() => {
         startCommandPhase(roomCode);
-    }, 5000);
+    }, 13000);
 }
 
 // Command templates for dual commanders
@@ -672,17 +687,33 @@ function executeNightKill(roomCode) {
             
             if (checkWinCondition(roomCode)) return;
             
+            // Wake up for next day
             setTimeout(() => {
-                room.dayNumber++;
-                startCommandPhase(roomCode);
-            }, 8000);
+                const nextDay = room.dayNumber + 1;
+                broadcastToRoom(roomCode, {
+                    type: 'WAKE_UP',
+                    payload: {
+                        phase: 'day',
+                        dayNumber: nextDay,
+                        message: `اليوم ${nextDay}`,
+                        location: 'salon'
+                    }
+                });
+                
+                room.dayNumber = nextDay;
+                
+                // Start command phase
+                setTimeout(() => {
+                    startCommandPhase(roomCode);
+                }, 10000);
+            }, 3000);
         }, 25000);
         
     } else {
         broadcastToRoom(roomCode, {
             type: 'NIGHT_PEACEFUL',
             payload: {
-                message: 'الليل مر بسلام - The night passed peacefully'
+                message: '✅ الليل مر بسلام - Nobody died'
             }
         });
         
@@ -695,8 +726,22 @@ function executeNightKill(roomCode) {
         if (checkWinCondition(roomCode)) return;
         
         setTimeout(() => {
-            room.dayNumber++;
-            startCommandPhase(roomCode);
+            const nextDay = room.dayNumber + 1;
+            broadcastToRoom(roomCode, {
+                type: 'WAKE_UP',
+                payload: {
+                    phase: 'day',
+                    dayNumber: nextDay,
+                    message: `اليوم ${nextDay}`,
+                    location: 'salon'
+                }
+            });
+            
+            room.dayNumber = nextDay;
+            
+            setTimeout(() => {
+                startCommandPhase(roomCode);
+            }, 10000);
         }, 5000);
     }
 }

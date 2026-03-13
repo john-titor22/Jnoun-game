@@ -857,6 +857,12 @@
                 case 'NIGHT_PEACEFUL':
                     updateHUD('✅ ليلة سلمية', payload.message);
                     break;
+                case 'JNOUN_POSSESSION_SEQUENCE':
+                    startJnounPossessionSequence(payload);
+                    break;
+                case 'WAKE_UP':
+                    handleWakeUp(payload);
+                    break;
                 case 'TRANSFORMATION':
                     handleTransformation(payload);
                     break;
@@ -1071,6 +1077,158 @@
             setTimeout(() => flashOverlay.remove(), 2000);
             
             updateHUD('💀 نجاة', payload.message);
+        }
+        
+        function startJnounPossessionSequence(data) {
+            console.log('Starting Jnoun possession sequence');
+            
+            // Player is in bedroom already, make it scary
+            const breathingOverlay = document.getElementById('breathingOverlay');
+            if (breathingOverlay) {
+                breathingOverlay.classList.add('active');
+                breathingOverlay.style.animation = 'breathe 1.5s ease-in-out infinite';
+                breathingOverlay.style.background = 'radial-gradient(circle, transparent 40%, rgba(139, 0, 0, 0.8) 100%)';
+            }
+            
+            updateHUD('😰 قلق', data.message);
+            
+            // Door slowly opens (3 seconds)
+            setTimeout(() => {
+                if (soundManager && soundManager.playDoorCreak) {
+                    soundManager.playDoorCreak();
+                }
+            }, 3000);
+            
+            // Jnoun appears in doorway after door opens
+            setTimeout(() => {
+                if (soundManager && soundManager.playScream) {
+                    soundManager.playScream();
+                }
+                updateHUD('👹 الجن', 'الجن يطاردك!');
+            }, 6000);
+            
+            // Jumpscare effect
+            setTimeout(() => {
+                triggerJumpscare();
+            }, 9000);
+        }
+        
+        function handleWakeUp(payload) {
+            console.log('Waking up for Day', payload.dayNumber);
+            
+            // Remove bedroom overlay
+            const breathingOverlay = document.getElementById('breathingOverlay');
+            if (breathingOverlay) {
+                breathingOverlay.classList.remove('active');
+                breathingOverlay.style.background = '';
+            }
+            
+            // Stop bedroom sounds
+            if (soundManager && soundManager.stopHeartbeat) {
+                soundManager.stopHeartbeat();
+            }
+            
+            // Show wake-up transition
+            showWakeUpTransition(payload);
+            
+            // Recreate day scene after transition
+            setTimeout(() => {
+                createDayScene();
+                
+                // Spawn in salon (ground floor, center)
+                camera.position.set(0, 1.6, 5);
+                camera.rotation.set(0, 0, 0);
+                
+                gameState.canMove = true;
+                
+                updateHUD(`☀️ ${payload.message}`, 'يوم جديد...');
+                
+            }, 3500);
+        }
+        
+        function showWakeUpTransition(data) {
+            const transition = document.createElement('div');
+            transition.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: #000;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 9500;
+                animation: fade-in-out 3.5s ease-in-out;
+            `;
+            
+            transition.innerHTML = `
+                <div style="text-align: center; color: white;">
+                    <h1 style="font-size: 3em; margin-bottom: 20px;">
+                        ☀️ ${data.message}
+                    </h1>
+                    <p style="font-size: 1.5em; color: #aaa;">
+                        Day ${data.dayNumber}
+                    </p>
+                </div>
+            `;
+            
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes fade-in-out {
+                    0% { opacity: 0; }
+                    15% { opacity: 1; }
+                    85% { opacity: 1; }
+                    100% { opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            document.body.appendChild(transition);
+            
+            setTimeout(() => transition.remove(), 3500);
+        }
+        
+        function createDayScene() {
+            clearScene();
+            
+            // Reset game state
+            gameState.canMove = true;
+            
+            // Rebuild riad structure
+            createRiadStructure();
+            
+            // Position camera in salon
+            camera.position.set(0, 1.6, 5);
+            camera.rotation.set(0, 0, 0);
+        }
+        
+        function clearScene() {
+            // Remove ALL objects from scene except camera
+            const objectsToRemove = [];
+            scene.traverse(obj => {
+                if (obj !== scene && obj !== camera) {
+                    objectsToRemove.push(obj);
+                }
+            });
+            
+            objectsToRemove.forEach(obj => {
+                scene.remove(obj);
+                
+                // Dispose geometry and materials
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material) {
+                    if (Array.isArray(obj.material)) {
+                        obj.material.forEach(m => m.dispose());
+                    } else {
+                        obj.material.dispose();
+                    }
+                }
+            });
+            
+            // Clear tracking arrays
+            taskMarkers = [];
+            otherPlayers.clear();
         }
 
         function handlePossession(payload) {
