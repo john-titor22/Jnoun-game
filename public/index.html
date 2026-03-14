@@ -1805,13 +1805,13 @@ function handlePlayerDeath(payload) {
             // LOAD AI-GENERATED TEXTURES
             const textureLoader = new THREE.TextureLoader();
             
-            // Load all AI images from project root
+            // Load all AI images from public folder
             const textures = {
-                bedroom: textureLoader.load('../lucid-origin_Abandoned_Moroccan_palace_bedroom_cracked_walls_dusty_bed_moonlight_through_wind-0.jpg'),
-                courtyard: textureLoader.load('../lucid-origin_Abandoned_Moroccan_riad_courtyard_central_fountain_two-story_arches_weathered_wa-0.jpg'),
-                interior: textureLoader.load('../lucid-origin_Interior_of_haunted_Moroccan_riad_ornate_Islamic_arches_peeling_plaster_walls_di-0.jpg'),
-                prayerRoom: textureLoader.load('../lucid-origin_Moroccan_riad_prayer_room_traditional_zellige_tile_patterns_worn_carpets_eerie_s-0.jpg'),
-                balcony: textureLoader.load('../lucid-origin_Moroccan_riad_upper_floor_balcony_overlooking_courtyard_ornate_wooden_railings_w-0.jpg')
+                bedroom: textureLoader.load('./lucid-origin_Abandoned_Moroccan_palace_bedroom_cracked_walls_dusty_bed_moonlight_through_wind-0.jpg'),
+                courtyard: textureLoader.load('./lucid-origin_Abandoned_Moroccan_riad_courtyard_central_fountain_two-story_arches_weathered_wa-0.jpg'),
+                interior: textureLoader.load('./lucid-origin_Interior_of_haunted_Moroccan_riad_ornate_Islamic_arches_peeling_plaster_walls_di-0.jpg'),
+                prayerRoom: textureLoader.load('./lucid-origin_Moroccan_riad_prayer_room_traditional_zellige_tile_patterns_worn_carpets_eerie_s-0.jpg'),
+                balcony: textureLoader.load('./lucid-origin_Moroccan_riad_upper_floor_balcony_overlooking_courtyard_ornate_wooden_railings_w-0.jpg')
             };
             
             // Configure texture settings for all textures
