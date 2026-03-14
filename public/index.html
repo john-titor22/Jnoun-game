@@ -1802,36 +1802,374 @@ function handlePlayerDeath(payload) {
         function createRiadStructure() {
             clearScene();
             
-            const { building, courtyard } = RIAD_CONFIG;
+            // LOAD AI-GENERATED TEXTURES
+            const textureLoader = new THREE.TextureLoader();
             
-            // Reset interactive objects
-            RIAD_CONFIG.doors = [];
-            RIAD_CONFIG.walls = [];
-            RIAD_CONFIG.stairs = [];
+            // Load all AI images from project root
+            const textures = {
+                bedroom: textureLoader.load('../lucid-origin_Abandoned_Moroccan_palace_bedroom_cracked_walls_dusty_bed_moonlight_through_wind-0.jpg'),
+                courtyard: textureLoader.load('../lucid-origin_Abandoned_Moroccan_riad_courtyard_central_fountain_two-story_arches_weathered_wa-0.jpg'),
+                interior: textureLoader.load('../lucid-origin_Interior_of_haunted_Moroccan_riad_ornate_Islamic_arches_peeling_plaster_walls_di-0.jpg'),
+                prayerRoom: textureLoader.load('../lucid-origin_Moroccan_riad_prayer_room_traditional_zellige_tile_patterns_worn_carpets_eerie_s-0.jpg'),
+                balcony: textureLoader.load('../lucid-origin_Moroccan_riad_upper_floor_balcony_overlooking_courtyard_ornate_wooden_railings_w-0.jpg')
+            };
             
-            // GROUND FLOOR
-            createGroundFloor();
+            // Configure texture settings for all textures
+            Object.values(textures).forEach(texture => {
+                texture.wrapS = THREE.RepeatWrapping;
+                texture.wrapT = THREE.RepeatWrapping;
+                texture.minFilter = THREE.LinearFilter;
+                texture.magFilter = THREE.LinearFilter;
+            });
             
-            // UPPER FLOOR
-            createUpperFloor();
+            console.log('AI textures loaded successfully');
             
-            // COURTYARD (open center)
-            createCourtyard();
-            
-            // STAIRCASES
-            createStaircases();
-            
-            // EXTERIOR WALLS
-            createExteriorWalls();
-            
-            // LIGHTING
-            setupRiadLighting();
+            // Create photorealistic riad with textures
+            createPhotorealisticRiad(textures);
             
             // Set camera to ground floor, courtyard entrance
-            camera.position.set(0, 1.6, 10);
+            camera.position.set(0, 1.6, 12);
             camera.rotation.set(0, Math.PI, 0);
             
             gameState.canMove = true;
+        }
+        
+        function createPhotorealisticRiad(textures) {
+            const RIAD_SIZE = 30;
+            const FLOOR_HEIGHT = 3.5;
+            
+            // ═══════════════════════════════════════════════════════
+            // COURTYARD FLOOR (using prayer room zellige texture)
+            // ═══════════════════════════════════════════════════════
+            
+            const courtyardFloor = new THREE.Mesh(
+                new THREE.PlaneGeometry(RIAD_SIZE, RIAD_SIZE),
+                new THREE.MeshStandardMaterial({
+                    map: textures.prayerRoom,
+                    roughness: 0.8,
+                    metalness: 0.1
+                })
+            );
+            courtyardFloor.rotation.x = -Math.PI / 2;
+            courtyardFloor.receiveShadow = true;
+            courtyardFloor.material.map.repeat.set(3, 3);
+            courtyardFloor.material.map.uScale = 3;
+            courtyardFloor.material.map.vScale = 3;
+            
+            scene.add(courtyardFloor);
+            
+            // ═══════════════════════════════════════════════════════
+            // WALLS (using interior arch texture)
+            // ═══════════════════════════════════════════════════════
+            
+            const wallMaterial = new THREE.MeshStandardMaterial({
+                map: textures.interior,
+                roughness: 0.95,
+                metalness: 0,
+                side: THREE.DoubleSide
+            });
+            
+            wallMaterial.map.repeat.set(2, 1);
+            wallMaterial.map.uScale = 2;
+            wallMaterial.map.vScale = 1;
+            
+            // Create 4 main walls
+            const wallConfigs = [
+                { w: RIAD_SIZE, h: FLOOR_HEIGHT * 2, d: 0.5, x: 0, y: FLOOR_HEIGHT, z: -RIAD_SIZE/2 }, // North
+                { w: RIAD_SIZE, h: FLOOR_HEIGHT * 2, d: 0.5, x: 0, y: FLOOR_HEIGHT, z: RIAD_SIZE/2 },  // South
+                { w: 0.5, h: FLOOR_HEIGHT * 2, d: RIAD_SIZE, x: -RIAD_SIZE/2, y: FLOOR_HEIGHT, z: 0 }, // West
+                { w: 0.5, h: FLOOR_HEIGHT * 2, d: RIAD_SIZE, x: RIAD_SIZE/2, y: FLOOR_HEIGHT, z: 0 }   // East
+            ];
+            
+            wallConfigs.forEach(config => {
+                const wall = new THREE.Mesh(
+                    new THREE.BoxGeometry(config.w, config.h, config.d),
+                    wallMaterial.clone()
+                );
+                wall.position.set(config.x, config.y, config.z);
+                wall.castShadow = true;
+                wall.receiveShadow = true;
+                scene.add(wall);
+                
+                RIAD_CONFIG.walls.push({box: new THREE.Box3().setFromObject(wall), mesh: wall});
+            });
+            
+            // ═══════════════════════════════════════════════════════
+            // UPPER FLOOR PLATFORMS (using balcony texture)
+            // ═══════════════════════════════════════════════════════
+            
+            const balconyMaterial = new THREE.MeshStandardMaterial({
+                map: textures.balcony,
+                roughness: 0.85,
+                metalness: 0.2
+            });
+            balconyMaterial.map.repeat.set(2, 2);
+            
+            const platformWidth = 6;
+            const platformY = FLOOR_HEIGHT;
+            
+            // North platform
+            const northPlatform = new THREE.Mesh(
+                new THREE.BoxGeometry(RIAD_SIZE, 0.3, platformWidth),
+                balconyMaterial.clone()
+            );
+            northPlatform.position.set(0, platformY, -RIAD_SIZE/2 + platformWidth/2);
+            northPlatform.receiveShadow = true;
+            northPlatform.castShadow = true;
+            scene.add(northPlatform);
+            
+            // South platform
+            const southPlatform = new THREE.Mesh(
+                new THREE.BoxGeometry(RIAD_SIZE, 0.3, platformWidth),
+                balconyMaterial.clone()
+            );
+            southPlatform.position.set(0, platformY, RIAD_SIZE/2 - platformWidth/2);
+            southPlatform.receiveShadow = true;
+            southPlatform.castShadow = true;
+            scene.add(southPlatform);
+            
+            // East platform
+            const eastPlatform = new THREE.Mesh(
+                new THREE.BoxGeometry(platformWidth, 0.3, RIAD_SIZE - platformWidth * 2),
+                balconyMaterial.clone()
+            );
+            eastPlatform.position.set(RIAD_SIZE/2 - platformWidth/2, platformY, 0);
+            eastPlatform.receiveShadow = true;
+            eastPlatform.castShadow = true;
+            scene.add(eastPlatform);
+            
+            // West platform
+            const westPlatform = new THREE.Mesh(
+                new THREE.BoxGeometry(platformWidth, 0.3, RIAD_SIZE - platformWidth * 2),
+                balconyMaterial.clone()
+            );
+            westPlatform.position.set(-RIAD_SIZE/2 + platformWidth/2, platformY, 0);
+            westPlatform.receiveShadow = true;
+            westPlatform.castShadow = true;
+            scene.add(westPlatform);
+            
+            // ═══════════════════════════════════════════════════════
+            // ORNATE PILLARS (using courtyard image for columns)
+            // ═══════════════════════════════════════════════════════
+            
+            const pillarMaterial = new THREE.MeshStandardMaterial({
+                map: textures.courtyard,
+                roughness: 0.9,
+                metalness: 0.1
+            });
+            
+            // Create pillars at corners and intervals
+            const pillarPositions = [
+                [-10, 0, -10], [10, 0, -10], [-10, 0, 10], [10, 0, 10], // Corners
+                [0, 0, -10], [0, 0, 10], [-10, 0, 0], [10, 0, 0] // Mid-points
+            ];
+            
+            pillarPositions.forEach(([x, y, z]) => {
+                const pillar = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.4, 0.5, FLOOR_HEIGHT * 2, 12),
+                    pillarMaterial.clone()
+                );
+                pillar.position.set(x, FLOOR_HEIGHT, z);
+                pillar.castShadow = true;
+                pillar.receiveShadow = true;
+                scene.add(pillar);
+            });
+            
+            // ═══════════════════════════════════════════════════════
+            // CENTRAL FOUNTAIN (procedural with courtyard texture accent)
+            // ═══════════════════════════════════════════════════════
+            
+            const fountainBase = new THREE.Mesh(
+                new THREE.CylinderGeometry(2, 2.5, 0.5, 8),
+                new THREE.MeshStandardMaterial({
+                    color: 0x8B7355,
+                    roughness: 0.8,
+                    metalness: 0.2
+                })
+            );
+            fountainBase.position.set(0, 0.25, 0);
+            fountainBase.castShadow = true;
+            scene.add(fountainBase);
+            
+            const fountain = new THREE.Mesh(
+                new THREE.CylinderGeometry(1.5, 1.8, 0.6, 8),
+                new THREE.MeshStandardMaterial({
+                    color: 0x6B8E86,
+                    roughness: 0.6,
+                    metalness: 0.3
+                })
+            );
+            fountain.position.set(0, 0.6, 0);
+            fountain.castShadow = true;
+            scene.add(fountain);
+            
+            // Water surface
+            const water = new THREE.Mesh(
+                new THREE.CylinderGeometry(1.3, 1.3, 0.1, 8),
+                new THREE.MeshStandardMaterial({
+                    color: 0x1a2a3a,
+                    transparent: true,
+                    opacity: 0.7,
+                    roughness: 0.1,
+                    metalness: 0.8
+                })
+            );
+            water.position.set(0, 0.9, 0);
+            scene.add(water);
+            
+            // ═══════════════════════════════════════════════════════
+            // ATMOSPHERIC LIGHTING (Enhanced)
+            // ═══════════════════════════════════════════════════════
+            
+            scene.fog = new THREE.Fog(0x1a1510, 8, 35);
+            
+            // Ambient light (darker for horror)
+            const ambient = new THREE.AmbientLight(0x2a1a0a, 0.25);
+            scene.add(ambient);
+            
+            // Main courtyard light (moonlight effect)
+            const moonlight = new THREE.DirectionalLight(0x9db4c0, 0.4);
+            moonlight.position.set(5, 15, 5);
+            moonlight.castShadow = true;
+            moonlight.shadow.mapSize.width = 2048;
+            moonlight.shadow.mapSize.height = 2048;
+            moonlight.shadow.camera.left = -20;
+            moonlight.shadow.camera.right = 20;
+            moonlight.shadow.camera.top = 20;
+            moonlight.shadow.camera.bottom = -20;
+            scene.add(moonlight);
+            
+            // Warm accent lights (flickering lanterns)
+            const lanternPositions = [
+                [-12, 2, -12], [12, 2, -12], [-12, 2, 12], [12, 2, 12],
+                [0, 2, -12], [0, 2, 12], [-12, 2, 0], [12, 2, 0]
+            ];
+            
+            lanternPositions.forEach(([x, y, z], i) => {
+                const lantern = new THREE.PointLight(0xff8833, 0.3, 12);
+                lantern.position.set(x, y, z);
+                lantern.castShadow = true;
+                scene.add(lantern);
+                
+                // Flicker effect
+                lantern.userData.baseIntensity = 0.3;
+                lantern.userData.offset = Math.random() * Math.PI * 2;
+                lantern.userData.flicker = true;
+            });
+            
+            // Upper floor lights
+            const upperLight = new THREE.PointLight(0xff9944, 0.25, 15);
+            upperLight.position.set(0, FLOOR_HEIGHT + 1, 0);
+            scene.add(upperLight);
+            
+            // ═══════════════════════════════════════════════════════
+            // DECORATIVE ELEMENTS (rugs with prayer room texture)
+            // ═══════════════════════════════════════════════════════
+            
+            const rugMaterial = new THREE.MeshStandardMaterial({
+                map: textures.prayerRoom,
+                roughness: 0.9,
+                metalness: 0
+            });
+            rugMaterial.map.repeat.set(1, 1.5);
+            
+            // Place rugs in corners
+            [-8, 8].forEach(x => {
+                [-8, 8].forEach(z => {
+                    const rug = new THREE.Mesh(
+                        new THREE.PlaneGeometry(3, 4),
+                        rugMaterial.clone()
+                    );
+                    rug.rotation.x = -Math.PI / 2;
+                    rug.position.set(x, 0.02, z);
+                    rug.receiveShadow = true;
+                    scene.add(rug);
+                });
+            });
+            
+            // Add ceiling/sky
+            const ceiling = new THREE.Mesh(
+                new THREE.PlaneGeometry(RIAD_SIZE, RIAD_SIZE),
+                new THREE.MeshStandardMaterial({
+                    color: 0x0a0a0a,
+                    roughness: 1,
+                    side: THREE.BackSide
+                })
+            );
+            ceiling.rotation.x = Math.PI / 2;
+            ceiling.position.y = FLOOR_HEIGHT * 2;
+            ceiling.receiveShadow = true;
+            scene.add(ceiling);
+            
+            // ═══════════════════════════════════════════════════════
+            // BEDROOM AREAS (using bedroom texture)
+            // ═══════════════════════════════════════════════════════
+            
+            const bedroomMaterial = new THREE.MeshStandardMaterial({
+                map: textures.bedroom,
+                roughness: 0.95,
+                metalness: 0
+            });
+            bedroomMaterial.map.repeat.set(1, 1);
+            
+            const bedroomPositions = [
+                { x: -10, z: -10 },
+                { x: 10, z: -10 },
+                { x: -10, z: 10 },
+                { x: 10, z: 10 }
+            ];
+            
+            bedroomPositions.forEach(pos => {
+                // Bedroom walls
+                const bedroomWall1 = new THREE.Mesh(
+                    new THREE.BoxGeometry(6, FLOOR_HEIGHT, 0.3),
+                    bedroomMaterial.clone()
+                );
+                bedroomWall1.position.set(pos.x, FLOOR_HEIGHT + FLOOR_HEIGHT/2, pos.z + 3);
+                bedroomWall1.castShadow = true;
+                bedroomWall1.receiveShadow = true;
+                scene.add(bedroomWall1);
+                
+                const bedroomWall2 = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.3, FLOOR_HEIGHT, 6),
+                    bedroomMaterial.clone()
+                );
+                bedroomWall2.position.set(pos.x + 3, FLOOR_HEIGHT + FLOOR_HEIGHT/2, pos.z);
+                bedroomWall2.castShadow = true;
+                bedroomWall2.receiveShadow = true;
+                scene.add(bedroomWall2);
+            });
+            
+            // Add volumetric lighting (dust particles for god rays)
+            addVolumetricLighting();
+            
+            console.log('Photorealistic riad created with AI textures');
+        }
+        
+        function addVolumetricLighting() {
+            const dustParticlesGeometry = new THREE.BufferGeometry();
+            const dustCount = 500;
+            const positions = new Float32Array(dustCount * 3);
+            
+            for (let i = 0; i < dustCount * 3; i += 3) {
+                positions[i] = (Math.random() - 0.5) * 30;     // x
+                positions[i + 1] = Math.random() * 7;          // y
+                positions[i + 2] = (Math.random() - 0.5) * 30; // z
+            }
+            
+            dustParticlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
+            const dustMaterial = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.05,
+                transparent: true,
+                opacity: 0.3,
+                blending: THREE.AdditiveBlending
+            });
+            
+            const dustParticles = new THREE.Points(dustParticlesGeometry, dustMaterial);
+            dustParticles.userData.isDustParticles = true;
+            scene.add(dustParticles);
         }
 
         function createGroundFloor() {
@@ -2671,6 +3009,18 @@ function handlePlayerDeath(payload) {
             scene.traverse(obj => {
                 if (obj.isLight && obj.userData.flicker) {
                     obj.intensity = obj.userData.baseIntensity + Math.sin(time * 3 + obj.userData.offset) * 0.1;
+                }
+            });
+            
+            // Animate dust particles (volumetric lighting)
+            scene.traverse(obj => {
+                if (obj.userData && obj.userData.isDustParticles) {
+                    const positions = obj.geometry.attributes.position.array;
+                    for (let i = 1; i < positions.length; i += 3) {
+                        positions[i] += 0.008; // Slow upward drift
+                        if (positions[i] > 7) positions[i] = 0; // Reset when too high
+                    }
+                    obj.geometry.attributes.position.needsUpdate = true;
                 }
             });
             
